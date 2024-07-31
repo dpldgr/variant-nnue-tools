@@ -456,6 +456,11 @@ inline const std::string& Position::piece_to_char() const {
   return var->pieceToChar;
 }
 
+inline const std::string& Position::piece_to_str( Piece pc ) const {
+    assert(var != nullptr);
+    return var->pieceToStr[pc];
+}
+
 inline const std::string& Position::piece_to_char_synonyms() const {
   assert(var != nullptr);
   return var->pieceToCharSynonyms;
