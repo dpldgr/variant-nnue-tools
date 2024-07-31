@@ -131,6 +131,7 @@ public:
   PieceSet piece_types() const;
   const std::string& piece_to_char() const;
   const std::string& piece_to_char_synonyms() const;
+  const std::string& piece_to_str(Piece pc) const;
   Bitboard promotion_zone(Color c) const;
   Square promotion_square(Color c, Square s) const;
   PieceType promotion_pawn_type(Color c) const;
