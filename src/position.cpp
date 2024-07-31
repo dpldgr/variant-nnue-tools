@@ -95,7 +95,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
   }
 
   for (File f = FILE_A; f <= pos.max_file(); ++f)
-      os << "   " << char('a' + f);
+      os << "     " << char('a' + f);
   os << "\n";
   os << "\nFen: " << pos.fen() << "\nSfen: " << pos.fen(true) << "\nKey: " << std::hex << std::uppercase
      << std::setfill('0') << std::setw(16) << pos.key()
