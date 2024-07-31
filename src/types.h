@@ -221,11 +221,10 @@ struct Bitboard {
    }
 };
 #endif
-constexpr int SQUARE_BITS = 7;
 #else
 typedef uint64_t Bitboard;
-constexpr int SQUARE_BITS = 8;
 #endif
+constexpr int SQUARE_BITS = 8;
 
 //When defined, move list will be stored in heap. Delete this if you want to use stack to store move list. Using stack can cause overflow (Segmentation Fault) when the search is too deep.
 #define USE_HEAP_INSTEAD_OF_STACK_FOR_MOVE_LIST
