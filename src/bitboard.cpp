@@ -63,7 +63,9 @@ namespace {
 
 // Some magics need to be split in order to reduce memory consumption.
 // Otherwise on a 12x10 board they can be >100 MB.
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+  // TODO XL_BOARDS: update for 16 x 16 boards. 
+#elif defined(LARGEBOARDS)
   Bitboard RookTableH[0x11800];  // To store horizontal rook attacks
   Bitboard RookTableV[0x4800];  // To store vertical rook attacks
   Bitboard BishopTable[0x33C00]; // To store bishop attacks
@@ -395,7 +397,11 @@ namespace {
 
     // Optimal PRNG seeds to pick the correct magics in the shortest time
 #ifndef PRECOMPUTED_MAGICS
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+    // TODO XL_BOARDS: update for 16 x 16 boards. 
+    int seeds[][RANK_NB] = { { 734, 10316, 55013, 32803, 12281, 15100,  16645, 255, 346, 89123 },
+                             { 734, 10316, 55013, 32803, 12281, 15100,  16645, 255, 346, 89123 } };
+#elif defined(LARGEBOARDS)
     int seeds[][RANK_NB] = { { 734, 10316, 55013, 32803, 12281, 15100,  16645, 255, 346, 89123 },
                              { 734, 10316, 55013, 32803, 12281, 15100,  16645, 255, 346, 89123 } };
 #else
@@ -423,7 +429,10 @@ namespace {
         Magic& m = magics[s];
         // The mask for hoppers is unlimited distance, even if the hopper is limited distance (e.g., grasshopper)
         m.mask  = (MT == LAME_LEAPER ? lame_leaper_path(directions, s) : sliding_attack<MT == HOPPER ? HOPPER_RANGE : MT>(directions, s, 0)) & ~edges;
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+        // TODO XL_BOARDS: update for 16 x 16 boards. 
+        m.shift = 256 - popcount(m.mask);
+#elif defined(LARGEBOARDS)
         m.shift = 128 - popcount(m.mask);
 #else
         m.shift = (Is64Bit ? 64 : 32) - popcount(m.mask);
@@ -460,7 +469,9 @@ namespace {
         {
             for (m.magic = 0; popcount((m.magic * m.mask) >> (SQUARE_NB - FILE_NB)) < FILE_NB - 2; )
             {
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+                // TODO XL_BOARDS: update for 16 x 16 boards. 
+#elif defined(LARGEBOARDS)
 #ifdef PRECOMPUTED_MAGICS
                 m.magic = magicsInit[s];
 #else

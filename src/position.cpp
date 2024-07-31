@@ -133,7 +133,11 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 // https://marcelk.net/2013-04-06/paper/upcoming-rep-v2.pdf
 
 // First and second hash functions for indexing the cuckoo tables
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+// TODO XL_BOARDS: update for 16 x 16 boards. 
+inline int H1(Key h) { return h & 0x7fff; }
+inline int H2(Key h) { return (h >> 16) & 0x7fff; }
+#elif defined(LARGEBOARDS)
 inline int H1(Key h) { return h & 0x7fff; }
 inline int H2(Key h) { return (h >> 16) & 0x7fff; }
 #else
@@ -142,7 +146,11 @@ inline int H2(Key h) { return (h >> 16) & 0x1fff; }
 #endif
 
 // Cuckoo tables with Zobrist hashes of valid reversible moves, and the moves themselves
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+// TODO XL_BOARDS: update for 16 x 16 boards. 
+Key cuckoo[65536];
+Move cuckooMove[65536];
+#elif defined(LARGEBOARDS)
 Key cuckoo[65536];
 Move cuckooMove[65536];
 #else
@@ -209,7 +217,10 @@ void Position::init() {
                   count++;
              }
       }
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+  // TODO XL_BOARDS: update for 16 x 16 boards. 
+  assert(count == 9344);
+#elif defined(LARGEBOARDS)
   assert(count == 9344);
 #else
   assert(count == 3668);
@@ -277,7 +288,9 @@ Position& Position::set(const Variant* v, const string& fenStr, bool isChess960,
   {
       if (isdigit(token))
       {
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+          // TODO XL_BOARDS: update for 16 x 16 boards. 
+#elif defined(LARGEBOARDS)
           if (isdigit(ss.peek()))
           {
               sq += 10 * (token - '0') * EAST;
@@ -422,7 +435,9 @@ Position& Position::set(const Variant* v, const string& fenStr, bool isChess960,
                  && ((ss >> row) && (row >= '1' && row <= '1' + max_rank())))
           {
               Square epSquare = make_square(File(col - 'a'), Rank(row - '1'));
-#ifdef LARGEBOARDS
+#if defined(XL_BOARDS)
+              // TODO XL_BOARDS: update for 16 x 16 boards. 
+#elif defined(LARGEBOARDS)
               // Consider different rank numbering in CECP
               if (max_rank() == RANK_10 && CurrentProtocol == XBOARD)
                   epSquare += NORTH;
