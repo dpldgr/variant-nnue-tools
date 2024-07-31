@@ -68,9 +68,9 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
           if (pos.state()->wallSquares & make_square(f, r))
               os << " | *";
           else if (pos.unpromoted_piece_on(make_square(f, r)))
-              os << " |+" << pos.unpromoted_piece_on(make_square(f, r));
+              os << " |+" << std::hex << pos.unpromoted_piece_on(make_square(f, r));
           else
-              os << " | " << pos.piece_on(make_square(f, r));
+              os << " | " << std::hex << pos.piece_on(make_square(f, r));
 
       os << " |" << (1 + r);
       if (r == pos.max_rank() || r == RANK_1)
