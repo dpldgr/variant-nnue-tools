@@ -59,7 +59,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 
   os << "\n ";
   for (File f = FILE_A; f <= pos.max_file(); ++f)
-      os << "+----";
+      os << "+-----";
   os << "+\n";
 
   for (Rank r = pos.max_rank(); r >= RANK_1; --r)
@@ -90,7 +90,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
       }
       os << "\n ";
       for (File f = FILE_A; f <= pos.max_file(); ++f)
-          os << "+----";
+          os << "+-----";
       os << "+\n";
   }
 
