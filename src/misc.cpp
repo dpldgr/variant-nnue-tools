@@ -158,7 +158,7 @@ string engine_info(bool to_uci, bool to_xboard) {
 
 #if defined(XL_BOARDS)
   ss << " XLB";
-#if defined(LARGEBOARDS)
+#elif defined(LARGEBOARDS)
   ss << " LB";
 #endif
 
