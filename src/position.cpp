@@ -59,7 +59,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 
   os << "\n ";
   for (File f = FILE_A; f <= pos.max_file(); ++f)
-      os << "+---";
+      os << "+----";
   os << "+\n";
 
   for (Rank r = pos.max_rank(); r >= RANK_1; --r)
@@ -68,9 +68,9 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
           if (pos.state()->wallSquares & make_square(f, r))
               os << " | *";
           else if (pos.unpromoted_piece_on(make_square(f, r)))
-              os << " |+" << std::hex << pos.unpromoted_piece_on(make_square(f, r));
+              os << " |+" << std::hex << std::setfill('0') << std::setw(2) << pos.unpromoted_piece_on(make_square(f, r));
           else
-              os << " | " << std::hex << pos.piece_on(make_square(f, r));
+              os << " | " << std::hex << std::setfill('0') << std::setw(2) << pos.piece_on(make_square(f, r));
 
       os << " |" << (1 + r);
       if (r == pos.max_rank() || r == RANK_1)
@@ -90,7 +90,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
       }
       os << "\n ";
       for (File f = FILE_A; f <= pos.max_file(); ++f)
-          os << "+---";
+          os << "+----";
       os << "+\n";
   }
 
