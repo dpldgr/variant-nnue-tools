@@ -66,9 +66,9 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
   {
       for (File f = FILE_A; f <= pos.max_file(); ++f)
           if (pos.state()->wallSquares & make_square(f, r))
-              os << " | *";
+              os << " |  *";
           else if (pos.unpromoted_piece_on(make_square(f, r)))
-              os << " |+" << std::hex << std::setfill('0') << std::setw(2) << pos.piece_to_str(pos.unpromoted_piece_on(make_square(f, r)));
+              os << " | +" << std::hex << std::setfill('0') << std::setw(2) << pos.piece_to_str(pos.unpromoted_piece_on(make_square(f, r)));
           else
               os << " | " << std::hex << std::setfill('0') << std::setw(2) << pos.piece_to_str(pos.piece_on(make_square(f, r)));
 
@@ -95,7 +95,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
   }
 
   for (File f = FILE_A; f <= pos.max_file(); ++f)
-      os << "     " << char('a' + f);
+      os << "    " << char('a' + f)  << " ";
   os << "\n";
   os << "\nFen: " << pos.fen() << "\nSfen: " << pos.fen(true) << "\nKey: " << std::hex << std::uppercase
      << std::setfill('0') << std::setw(16) << pos.key()
