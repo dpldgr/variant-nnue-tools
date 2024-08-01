@@ -66,7 +66,7 @@ void on_logger(const Option& o) { start_logger(o); }
 void on_threads(const Option& o) { Threads.set(size_t(o)); }
 void on_tb_path(const Option& o) { Tablebases::init(o); }
 
-void on_interactive_mode(const Option&) { interactive_mode = o; }
+void on_interactive_mode(const Option& o) { interactive_mode = o; }
 void on_use_NNUE(const Option& ) { Eval::NNUE::init(); }
 void on_eval_file(const Option& ) { Eval::NNUE::init(); }
 void on_prune_at_shallow_depth(const Option& o) {
