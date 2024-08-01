@@ -44,6 +44,7 @@ namespace PSQT {
 }
 
 namespace UCI {
+    bool interactive_mode = false;
 
 // standard variants of XBoard/WinBoard
 std::set<string> standard_variants = {
@@ -65,6 +66,7 @@ void on_logger(const Option& o) { start_logger(o); }
 void on_threads(const Option& o) { Threads.set(size_t(o)); }
 void on_tb_path(const Option& o) { Tablebases::init(o); }
 
+void on_interactive_mode(const Option&) { interactive_mode = o; }
 void on_use_NNUE(const Option& ) { Eval::NNUE::init(); }
 void on_eval_file(const Option& ) { Eval::NNUE::init(); }
 void on_prune_at_shallow_depth(const Option& o) {
@@ -251,6 +253,7 @@ void init(OptionsMap& o) {
   o["Syzygy50MoveRule"]      << Option(true);
   o["SyzygyProbeLimit"]      << Option(7, 0, 7);
   o["Use NNUE"]              << Option("true", {"true", "false", "pure"}, on_use_NNUE);
+  o["UCI_InteractiveMode"]   << Option(false, on_interactive_mode);
 #ifndef NNUE_EMBEDDING_OFF
   o["EvalFile"]              << Option(EvalFileDefaultName, on_eval_file);
 #else
