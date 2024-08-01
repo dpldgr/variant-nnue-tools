@@ -97,6 +97,9 @@ namespace {
   Bitboard GrasshopperTableD[0x1480]; // To store diagonal grasshopper attacks
 #endif
 
+  Bitboard OmegaWizard[64] = { 0x0000000000050106,0x00000000000A020D,0x000000000015041B,0x00000000002A0836,0x000000000054106C,0x0000000000A820D8,0x00000000005040B0,0x0000000000A08060 };
+  Bitboard OmegaChampion[64];
+
   // Rider directions
   const std::map<Direction, int> RookDirectionsV { {NORTH, 0}, {SOUTH, 0}};
   const std::map<Direction, int> RookDirectionsH { {EAST, 0}, {WEST, 0} };
