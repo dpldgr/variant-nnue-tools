@@ -33,6 +33,8 @@ class Position;
 
 namespace UCI {
 
+extern bool interactive_mode;
+
 
 #ifndef _WIN32
   constexpr char SepChar = ':';
@@ -101,7 +103,6 @@ bool is_valid_option(UCI::OptionsMap& options, std::string& name);
 } // namespace UCI
 
 extern UCI::OptionsMap Options;
-extern bool interactive_mode;
 
 enum Protocol {
   UCI_GENERAL,
