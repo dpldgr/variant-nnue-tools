@@ -492,6 +492,10 @@ void UCI::loop(int argc, char* argv[]) {
           is.seekg(0);
           position(pos, is, states);
       }
+      else if (interactive_mode && token == "move")
+      {
+          sync_cout << "moveok" << sync_endl;
+      }
       else if (token == "generate_training_data") Tools::generate_training_data(is);
       else if (token == "generate_training_data") Tools::generate_training_data_nonpv(is);
       else if (token == "convert") Tools::convert(is);
