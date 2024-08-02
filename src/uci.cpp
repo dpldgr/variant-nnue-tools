@@ -60,7 +60,6 @@ namespace {
 
     Move m;
     string token, fen;
-    UCI::interactive_mode_moves = "";
 
     is >> token;
     // Parse as SFEN if specified
@@ -77,7 +76,6 @@ namespace {
     else
         return;
 
-    if (UCI::interactive_mode) UCI::interactive_mode_startfen = fen;
     states = StateListPtr(new std::deque<StateInfo>(1)); // Drop old and create a new one
     pos.set(variants.find(Options["UCI_Variant"])->second, fen, Options["UCI_Chess960"], &states->back(), Threads.main(), sfen);
 
@@ -86,7 +84,6 @@ namespace {
     {
         states->emplace_back();
         pos.do_move(m, states->back());
-        if (UCI::interactive_mode) UCI::interactive_mode_moves += (m + " ");
     }
   }
 
@@ -503,7 +500,6 @@ void UCI::loop(int argc, char* argv[]) {
           bool move_ok;
 
           is >> token;
-          sync_cout << "Move:" << sync_endl << token << sync_endl;
           m = UCI::to_move(pos, token);
           move_ok = MoveList<LEGAL>(pos).contains(m);
 
@@ -512,7 +508,6 @@ void UCI::loop(int argc, char* argv[]) {
               states->emplace_back();
               pos.do_move(m, states->back());
               sync_cout << "moveok" << sync_endl << pos << sync_endl;
-
           }
           else
           {
