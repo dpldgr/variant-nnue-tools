@@ -504,7 +504,7 @@ void UCI::loop(int argc, char* argv[]) {
 
           is >> token;
           sync_cout << "Move:" << sync_endl << token << sync_endl;
-          m = UCI::to_move(pos, token));
+          m = UCI::to_move(pos, token);
           move_ok = MoveList<LEGAL>(pos).contains(m);
 
           if (move_ok)
