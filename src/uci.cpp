@@ -500,24 +500,18 @@ void UCI::loop(int argc, char* argv[]) {
       {
           Move m;
           string token, fen;
+          bool move_ok;
 
-          // Parse move list (if any)
-          sync_cout << "Moves" << sync_endl;
-          while (is >> token && (m = UCI::to_move(pos, token)) != MOVE_NONE)
-          {
-              sync_cout << token << sync_endl;
-              states->emplace_back();
-              pos.do_move(m, states->back());
-          }
-
-          sync_cout << "Last move: " << m << sync_endl;
-
-          bool move_ok = MoveList<LEGAL>(pos).contains(m);
+          is >> token;
+          sync_cout << "Move:" << sync_endl << token << sync_endl;
+          m = UCI::to_move(pos, token));
+          move_ok = MoveList<LEGAL>(pos).contains(m);
 
           if (move_ok)
           {
-              sync_cout << pos << sync_endl;
-              sync_cout << "moveok" << sync_endl;
+              states->emplace_back();
+              pos.do_move(m, states->back());
+              sync_cout << "moveok" << sync_endl << pos << sync_endl;
 
           }
           else
