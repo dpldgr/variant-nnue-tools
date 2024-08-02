@@ -54,11 +54,13 @@ namespace {
   // The function sets up the position described in the given FEN string ("fen")
   // or the starting position ("startpos") and then makes the moves given in the
   // following move list ("moves").
+  // following move list ("moves").
 
   void position(Position& pos, istringstream& is, StateListPtr& states) {
 
     Move m;
     string token, fen;
+    UCI::interactive_mode_moves = "";
 
     is >> token;
     // Parse as SFEN if specified
@@ -75,6 +77,7 @@ namespace {
     else
         return;
 
+    if (UCI::interactive_mode) UCI::interactive_mode_startfen = fen;
     states = StateListPtr(new std::deque<StateInfo>(1)); // Drop old and create a new one
     pos.set(variants.find(Options["UCI_Variant"])->second, fen, Options["UCI_Chess960"], &states->back(), Threads.main(), sfen);
 
@@ -83,6 +86,7 @@ namespace {
     {
         states->emplace_back();
         pos.do_move(m, states->back());
+        if (UCI::interactive_mode) UCI::interactive_mode_moves += (m + " ");
     }
   }
 
@@ -494,7 +498,28 @@ void UCI::loop(int argc, char* argv[]) {
       }
       else if (interactive_mode && token == "move")
       {
-          sync_cout << "moveok" << sync_endl;
+          Move m;
+          string token, fen;
+
+          // Parse move list (if any)
+          while (is >> token && (m = UCI::to_move(pos, token)) != MOVE_NONE)
+          {
+              states->emplace_back();
+              pos.do_move(m, states->back());
+          }
+
+          bool move_ok = MoveList<LEGAL>(pos).contains(m);
+
+          if (move_ok)
+          {
+              sync_cout << pos << sync_endl;
+              sync_cout << "moveok" << sync_endl;
+
+          }
+          else
+          {
+              sync_cout << "movefail" << sync_endl;
+          }
       }
       else if (token == "generate_training_data") Tools::generate_training_data(is);
       else if (token == "generate_training_data") Tools::generate_training_data_nonpv(is);

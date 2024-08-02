@@ -34,6 +34,8 @@ class Position;
 namespace UCI {
 
 extern bool interactive_mode;
+extern std::string interactive_mode_startfen;
+extern std::string interactive_mode_moves;
 
 
 #ifndef _WIN32

@@ -45,6 +45,9 @@ namespace PSQT {
 
 namespace UCI {
     bool interactive_mode = false;
+    std::string interactive_mode_startfen;
+    std::string interactive_mode_moves;
+
 
 // standard variants of XBoard/WinBoard
 std::set<string> standard_variants = {
