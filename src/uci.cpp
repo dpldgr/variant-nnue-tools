@@ -498,10 +498,8 @@ void UCI::loop(int argc, char* argv[]) {
           Move m;
           string token, fen;
           bool move_ok;
-          istringstream is2;
-          string position_str = "position startpos moves e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 g8f6 d4c6 b7c6";
-
-          is2 << position_str;
+          istringstream is2(interactive_mode_position_str);
+          sync_cout << "im_pos:" << interactive_mode_position_str << sync_endl;
 
           position(pos, is2, states);
 
@@ -510,11 +508,12 @@ void UCI::loop(int argc, char* argv[]) {
           m = UCI::to_move(pos, token);
           move_ok = MoveList<LEGAL>(pos).contains(m);
 
-
           if (move_ok)
           {
-              is2 << (position_str + " " + token);
-              position(pos, is2, states);
+              interactive_mode_position_str += (" " + token);
+              istringstream is3(interactive_mode_position_str);
+              sync_cout << "im_pos:" << interactive_mode_position_str << sync_endl;
+              position(pos, is3, states);
               sync_cout << "moveok" << sync_endl << pos << sync_endl;
           }
           else
