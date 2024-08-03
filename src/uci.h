@@ -34,6 +34,7 @@ class Position;
 namespace UCI {
 
 extern bool interactive_mode;
+extern string interactive_mode_position_str;
 
 #ifndef _WIN32
   constexpr char SepChar = ':';
