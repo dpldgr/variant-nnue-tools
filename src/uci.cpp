@@ -498,8 +498,33 @@ void UCI::loop(int argc, char* argv[]) {
           Move m;
           string token, fen;
           bool move_ok;
+          istringstream is2;
+          string position_str = "position startpos moves e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 g8f6 d4c6 b7c6";
+
+          is2 << position_str;
+
+          position(pos, is2, states);
 
           is >> token;
+
+          m = UCI::to_move(pos, token);
+          move_ok = MoveList<LEGAL>(pos).contains(m);
+
+
+          if (move_ok)
+          {
+              is2 << (position_str + " " + token);
+              position(pos, is2, states);
+              sync_cout << "moveok" << sync_endl << pos << sync_endl;
+          }
+          else
+          {
+              sync_cout << "movefail" << sync_endl;
+          }
+
+          /*
+          is2 >> token;
+
           m = UCI::to_move(pos, token);
           move_ok = MoveList<LEGAL>(pos).contains(m);
 
@@ -513,6 +538,7 @@ void UCI::loop(int argc, char* argv[]) {
           {
               sync_cout << "movefail" << sync_endl;
           }
+          //*/
       }
       else if (token == "generate_training_data") Tools::generate_training_data(is);
       else if (token == "generate_training_data") Tools::generate_training_data_nonpv(is);
