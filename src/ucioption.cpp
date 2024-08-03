@@ -45,7 +45,7 @@ namespace PSQT {
 
 namespace UCI {
     bool interactive_mode = false;
-    string interactive_mode_position_string = "position startpos moves";
+    std::string interactive_mode_position_string = "position startpos moves";
 
 // standard variants of XBoard/WinBoard
 std::set<string> standard_variants = {
