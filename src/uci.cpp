@@ -510,7 +510,7 @@ void UCI::loop(int argc, char* argv[]) {
 
           if (move_ok)
           {
-              UCI::interactive_mode_position_str += (" " + token);
+              interactive_mode_position_str += (" " + token);
               istringstream is3(interactive_mode_position_str);
               sync_cout << "im_pos:" << interactive_mode_position_str << sync_endl;
               position(pos, is3, states);
