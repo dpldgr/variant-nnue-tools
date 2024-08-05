@@ -110,7 +110,135 @@ constexpr bool Is64Bit = false;
 #endif
 
 typedef uint64_t Key;
-#ifdef LARGEBOARDS
+
+
+
+#if defined(XL_BOARDS)
+// TODO XL_BOARDS: update for 16 x 16 boards. 
+struct Bitboard {
+    uint64_t b64[4];
+
+    constexpr Bitboard() : b64{ 0, 0, 0, 0 } {}
+    constexpr Bitboard(uint64_t i) : b64{ 0, 0, 0, i } {}
+    constexpr Bitboard(uint64_t i1, uint64_t i2) : b64{ 0, 0, i1, i2 } {};
+    constexpr Bitboard(uint64_t i1, uint64_t i2, uint64_t i3) : b64{ 0, i1, i2, i3 } {};
+    constexpr Bitboard(uint64_t i1, uint64_t i2, uint64_t i3, uint64_t i4 ) : b64{ i1, i2, i3, i4 } {};
+
+    constexpr operator bool() const {
+        return b64[0] || b64[1] || b64[2] || b64[3];
+    }
+
+    // XL_BOARDS TODO.
+    constexpr operator long long unsigned() const {
+        return b64[1];
+    }
+
+    // XL_BOARDS TODO.
+    constexpr operator unsigned() const {
+        return b64[1];
+    }
+
+    // XL_BOARDS TODO.
+    constexpr Bitboard operator << (const unsigned int bits) const {
+        return Bitboard(bits >= 64 ? b64[1] << (bits - 64)
+            : bits == 0 ? b64[0]
+            : ((b64[0] << bits) | (b64[1] >> (64 - bits))),
+            bits >= 64 ? 0 : b64[1] << bits);
+    }
+
+    // XL_BOARDS TODO.
+    constexpr Bitboard operator >> (const unsigned int bits) const {
+        return Bitboard(bits >= 64 ? 0 : b64[0] >> bits,
+            bits >= 64 ? b64[0] >> (bits - 64)
+            : bits == 0 ? b64[1]
+            : ((b64[1] >> bits) | (b64[0] << (64 - bits))));
+    }
+
+    // XL_BOARDS TODO.
+    constexpr Bitboard operator << (const int bits) const {
+        return *this << unsigned(bits);
+    }
+
+    // XL_BOARDS TODO.
+    constexpr Bitboard operator >> (const int bits) const {
+        return *this >> unsigned(bits);
+    }
+
+    constexpr bool operator == (const Bitboard y) const {
+        return (b64[0] == y.b64[0]) && (b64[1] == y.b64[1] && (b64[2] == y.b64[2] && (b64[3] == y.b64[3]);
+    }
+
+    constexpr bool operator != (const Bitboard y) const {
+        return !(*this == y);
+    }
+
+    inline Bitboard& operator |=(const Bitboard x) {
+        b64[0] |= x.b64[0];
+        b64[1] |= x.b64[1];
+        b64[2] |= x.b64[2];
+        b64[3] |= x.b64[3];
+        return *this;
+    }
+    inline Bitboard& operator &=(const Bitboard x) {
+        b64[0] &= x.b64[0];
+        b64[1] &= x.b64[1];
+        b64[2] &= x.b64[2];
+        b64[3] &= x.b64[3];
+        return *this;
+    }
+    inline Bitboard& operator ^=(const Bitboard x) {
+        b64[0] ^= x.b64[0];
+        b64[1] ^= x.b64[1];
+        b64[2] ^= x.b64[2];
+        b64[3] ^= x.b64[3];
+        return *this;
+    }
+
+    constexpr Bitboard operator ~ () const {
+        return Bitboard(~b64[0], ~b64[1], ~b64[2], ~b64[3]);
+    }
+
+    // XL_BOARDS TODO.
+    constexpr Bitboard operator - () const {
+        return Bitboard(-b64[0] - (b64[1] > 0), -b64[1]);
+    }
+
+    constexpr Bitboard operator | (const Bitboard x) const {
+        return Bitboard(b64[0] | x.b64[0], b64[1] | x.b64[1], b64[2] | x.b64[2], b64[3] | x.b64[3]);
+    }
+
+    constexpr Bitboard operator & (const Bitboard x) const {
+        return Bitboard(b64[0] & x.b64[0], b64[1] & x.b64[1], b64[2] | x.b64[2], b64[3] | x.b64[3]);
+    }
+
+    constexpr Bitboard operator ^ (const Bitboard x) const {
+        return Bitboard(b64[0] ^ x.b64[0], b64[1] ^ x.b64[1], b64[2] | x.b64[2], b64[3] | x.b64[3]);
+    }
+
+    // XL_BOARDS TODO.
+    constexpr Bitboard operator - (const Bitboard x) const {
+        return Bitboard(b64[0] - x.b64[0] - (b64[1] < x.b64[1]), b64[1] - x.b64[1]);
+    }
+
+    constexpr Bitboard operator - (const int x) const {
+        return *this - Bitboard(x);
+    }
+
+    // XL_BOARDS TODO.
+    inline Bitboard operator * (const Bitboard x) const {
+        uint64_t a_lo = (uint32_t)b64[1];
+        uint64_t a_hi = b64[1] >> 32;
+        uint64_t b_lo = (uint32_t)x.b64[1];
+        uint64_t b_hi = x.b64[1] >> 32;
+
+        uint64_t t1 = (a_hi * b_lo) + ((a_lo * b_lo) >> 32);
+        uint64_t t2 = (a_lo * b_hi) + (t1 & 0xFFFFFFFF);
+
+        return Bitboard(b64[0] * x.b64[1] + b64[1] * x.b64[0] + (a_hi * b_hi) + (t1 >> 32) + (t2 >> 32),
+            (t2 << 32) + (a_lo * b_lo & 0xFFFFFFFF));
+    }
+};
+#elif defined(LARGEBOARDS)
 #if defined(__GNUC__) && defined(IS_64BIT)
 typedef unsigned __int128 Bitboard;
 #else

@@ -40,7 +40,10 @@ std::string pretty(Bitboard b);
 
 } // namespace Stockfish::Bitboards
 
-#ifdef LARGEBOARDS
+// First and second hash functions for indexing the cuckoo tables
+#if defined(XL_BOARDS)
+// TODO XL_BOARDS: update for 16 x 16 boards. 
+#elif defined(LARGEBOARDS)
 constexpr Bitboard AllSquares = ((~Bitboard(0)) >> 8);
 #else
 constexpr Bitboard AllSquares = ~Bitboard(0);
