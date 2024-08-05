@@ -15,6 +15,13 @@ using namespace std;
 
 namespace Stockfish::Tools {
 
+    int code_size;
+
+    void set_code_size( int piece_type_count )
+    {
+        code_size = ceil(log2(piece_type_count));
+    }
+
     // Class that handles bitstream
     // useful when doing aspect encoding
     struct BitStream
@@ -138,10 +145,122 @@ namespace Stockfish::Tools {
     // - game ply            16 bits
     // - TOTAL               469 bits < 512 bits
 
+    class CodedPiece
+    {
+    private:
+        int code;
+        int bits;
+    public:
+        CodedPiece(int b)
+            :bits(b)
+        {
+            code = 0;
+        }
+
+        CodedPiece(Piece pc, int b)
+            :bits(b)
+        {
+            PieceType pt = type_of(pc);
+            Color c = color_of(pc);
+
+            if (pt == KING)
+            {
+                pt = NO_PIECE_TYPE;
+            }
+
+            code = (c << (bits - 1)) | pt;
+        }
+
+        CodedPiece(Color c, PieceType pt, int b)
+            :bits(b)
+        {
+            code = (c << (bits - 1)) | pt;
+        }
+
+        CodedPiece& operator=(Piece pc)
+        {
+            PieceType pt = type_of(pc);
+            Color c = color_of(pc);
+
+            if (pt == KING)
+            {
+                pt = NO_PIECE_TYPE;
+            }
+
+            code = (c << (bits - 1)) | pt;
+
+            return *this;
+        }
+
+        CodedPiece& operator=(Color c)
+        {
+            code = (c << (bits - 1)) | (code & ~(c << (bits - 1)));
+
+            return *this;
+        }
+
+        CodedPiece& operator=(PieceType pt)
+        {
+            if (pt == KING)
+            {
+                pt = NO_PIECE_TYPE;
+            }
+
+            code = c() | pt;
+
+            return *this;
+        }
+
+        inline Piece pc()
+        {
+            return make_piece(c(), pt());
+        }
+
+        inline PieceType pt()
+        {
+            PieceType ret = PieceType(code & ((1 << (bits - 1)) - 1));
+
+            if (ret == NO_PIECE_TYPE)
+            {
+                ret = KING;
+            }
+
+            return ret;
+        }
+
+        inline Color c()
+        {
+            return Color(code >> (bits - 1));
+        }
+
+        inline int stream_code()
+        {
+            return code | (1 << bits);
+        }
+
+        inline int stream_bits()
+        {
+            return bits + 1;
+        }
+    };
+
     struct HuffmanedPiece
     {
         int code; // how it will be coded
         int bits; // How many bits do you have
+    };
+
+    constexpr HuffmanedPiece huffman_table4[] =
+    {
+        {0b0000,1}, // NO_PIECE
+        {0b0001,4}, //
+        {0b0011,4}, //
+        {0b0101,4}, //
+        {0b0111,4}, //
+        {0b1001,4}, //
+        {0b1011,4}, //
+        {0b1101,4}, //
+        {0b1111,4}, //
     };
 
     constexpr HuffmanedPiece huffman_table5[] =
@@ -168,12 +287,12 @@ namespace Stockfish::Tools {
     constexpr HuffmanedPiece huffman_table6[] =
     {
         {0b000000,1}, // NO_PIECE
-        {0b000001,6}, // PAWN
-        {0b000011,6}, // KNIGHT
-        {0b000101,6}, // BISHOP
-        {0b000111,6}, // ROOK
-        {0b001001,6}, // QUEEN
-        {0b001011,6}, //
+        {0b000001,6}, // KING
+        {0b000011,6}, // PAWN
+        {0b000101,6}, // KNIGHT
+        {0b000111,6}, // BISHOP
+        {0b001001,6}, // ROOK
+        {0b001011,6}, // QUEEN
         {0b001101,6}, //
         {0b001111,6}, //
         {0b010001,6}, //
@@ -200,6 +319,75 @@ namespace Stockfish::Tools {
         {0b111011,6}, //
         {0b111101,6}, //
         {0b111111,6}, //
+    };
+
+    constexpr HuffmanedPiece huffman_table7[] =
+    {
+        {0b0000000,1}, // NO_PIECE
+        {0b0000001,7}, // KING
+        {0b0000011,7}, // PAWN
+        {0b0000101,7}, // KNIGHT
+        {0b0000111,7}, // BISHOP
+        {0b0001001,7}, // ROOK
+        {0b0001011,7}, // QUEEN
+        {0b0001101,7}, //
+        {0b0001111,7}, //
+        {0b0010001,7}, //
+        {0b0010011,7}, //
+        {0b0010101,7}, //
+        {0b0010111,7}, //
+        {0b0011001,7}, //
+        {0b0011011,7}, //
+        {0b0011101,7}, //
+        {0b0011111,7}, //
+        {0b0100001,7}, //
+        {0b0100011,7}, //
+        {0b0100101,7}, //
+        {0b0100111,7}, //
+        {0b0101001,7}, //
+        {0b0101011,7}, //
+        {0b0101101,7}, //
+        {0b0101111,7}, //
+        {0b0110001,7}, //
+        {0b0110011,7}, //
+        {0b0110101,7}, //
+        {0b0110111,7}, //
+        {0b0111001,7}, //
+        {0b0111011,7}, //
+        {0b0111101,7}, //
+        {0b0111111,7}, //
+        {0b1000001,7}, //
+        {0b1000011,7}, //
+        {0b1000101,7}, //
+        {0b1000111,7}, //
+        {0b1001001,7}, //
+        {0b1001011,7}, //
+        {0b1001101,7}, //
+        {0b1001111,7}, //
+        {0b1010001,7}, //
+        {0b1010011,7}, //
+        {0b1010101,7}, //
+        {0b1010111,7}, //
+        {0b1011001,7}, //
+        {0b1011011,7}, //
+        {0b1011101,7}, //
+        {0b1011111,7}, //
+        {0b1100001,7}, //
+        {0b1100011,7}, //
+        {0b1100101,7}, //
+        {0b1100111,7}, //
+        {0b1101001,7}, //
+        {0b1101011,7}, //
+        {0b1101101,7}, //
+        {0b1101111,7}, //
+        {0b1110001,7}, //
+        {0b1110011,7}, //
+        {0b1110101,7}, //
+        {0b1110111,7}, //
+        {0b1111001,7}, //
+        {0b1111011,7}, //
+        {0b1111101,7}, //
+        {0b1111111,7}, //
     };
 
     inline Square to_variant_square(Square s, const Position& pos) {
@@ -281,7 +469,9 @@ namespace Stockfish::Tools {
     {
         // piece type
         PieceType pr = PieceType(pc == NO_PIECE ? NO_PIECE_TYPE : pos.variant()->pieceIndex[type_of(pc)] + 1);
-        auto c = (pieceTypeCount > 16) ? huffman_table6[pr] : huffman_table5[pr];
+        //auto c = (pieceTypeCount > 16) ? huffman_table6[pr] : huffman_table5[pr];
+        auto c = encodePiece(pc);
+        CodedPiece c( pc );
         stream.write_n_bit(c.code, c.bits);
 
         if (pc == NO_PIECE)
