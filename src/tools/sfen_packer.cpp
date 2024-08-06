@@ -151,14 +151,16 @@ namespace Stockfish::Tools {
         int code;
         int bits;
     public:
-        CodedPiece(int b)
-            :bits(b)
+        static int code_size;
+
+        CodedPiece()
+            :bits(code_size)
         {
             code = 0;
         }
 
-        CodedPiece(Piece pc, int b)
-            :bits(b)
+        CodedPiece(Piece pc)
+            :bits(code_size)
         {
             PieceType pt = type_of(pc);
             Color c = color_of(pc);
@@ -171,8 +173,8 @@ namespace Stockfish::Tools {
             code = (c << (bits - 1)) | pt;
         }
 
-        CodedPiece(Color c, PieceType pt, int b)
-            :bits(b)
+        CodedPiece(Color c, PieceType pt)
+            :bits(code_size)
         {
             code = (c << (bits - 1)) | pt;
         }
@@ -211,12 +213,14 @@ namespace Stockfish::Tools {
             return *this;
         }
 
-        inline Piece pc()
+        inline Piece& pc() const
         {
-            return make_piece(c(), pt());
+            Piece ret = make_piece(c(), pt());
+
+            return ret;
         }
 
-        inline PieceType pt()
+        inline PieceType& pt() const
         {
             PieceType ret = PieceType(code & ((1 << (bits - 1)) - 1));
 
@@ -228,9 +232,42 @@ namespace Stockfish::Tools {
             return ret;
         }
 
-        inline Color c()
+        inline Color& c() const
         {
-            return Color(code >> (bits - 1));
+            Color ret = Color(code >> (bits - 1));
+
+            return ret;
+        }
+
+        inline operator Piece() const
+        {
+            return pc();
+        }
+
+        inline operator PieceType() const
+        {
+            return pt();
+        }
+
+        inline operator Color() const
+        {
+            return c();
+        }
+
+        inline int _code()
+        {
+            return code;
+        }
+
+        inline void _code(int c)
+        {
+            bits = code_size;
+            code = c;
+        }
+
+        inline int _bits()
+        {
+            return bits;
         }
 
         inline int stream_code()
@@ -243,6 +280,8 @@ namespace Stockfish::Tools {
             return bits + 1;
         }
     };
+
+    int CodedPiece::code_size = PIECE_TYPE_BITS + 1;
 
     struct HuffmanedPiece
     {
@@ -465,12 +504,27 @@ namespace Stockfish::Tools {
     }
 
     // Output the board pieces to stream.
+    void SfenPacker::write_board_piece_to_stream(const Position& pos, CodedPiece c)
+    {
+        stream.write_n_bit( c._code(), c._bits() );
+    }
+
+    // Read one board piece from stream
+    CodedPiece SfenPacker::read_board_piece_from_stream(const Position& pos)
+    {
+        CodedPiece ret;
+
+        ret = stream.read_n_bit(CodedPiece::code_size);
+
+        return ret;
+    }
+
+    // Output the board pieces to stream.
     void SfenPacker::write_board_piece_to_stream(const Position& pos, Piece pc)
     {
         // piece type
         PieceType pr = PieceType(pc == NO_PIECE ? NO_PIECE_TYPE : pos.variant()->pieceIndex[type_of(pc)] + 1);
-        //auto c = (pieceTypeCount > 16) ? huffman_table6[pr] : huffman_table5[pr];
-        auto c = encodePiece(pc);
+        auto c = (pieceTypeCount > 16) ? huffman_table6[pr] : huffman_table5[pr];
         CodedPiece c( pc );
         stream.write_n_bit(c.code, c.bits);
 
