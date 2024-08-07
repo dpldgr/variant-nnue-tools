@@ -16,7 +16,6 @@ namespace Stockfish::Tools {
     {
         Bin,
         Binpack,
-        Bin2,
     };
 
     static bool ends_with(const std::string& lhs, const std::string& end)

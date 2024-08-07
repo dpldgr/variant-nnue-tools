@@ -15,6 +15,9 @@ using namespace std;
 
 namespace Stockfish::Tools {
 
+    class CodedPiece;
+
+
     int code_size;
 
     void set_code_size( int piece_type_count )
