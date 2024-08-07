@@ -114,6 +114,9 @@ namespace Stockfish::Tools {
         // Used to determine how many bits per piece to write/read.
         int pieceTypeCount;
 
+        void write_board_piece_to_stream(const Position& pos, CodedPiece cpc);
+        CodedPiece read_board_piece_from_stream(const Position& pos);
+
         // Output the board pieces to stream.
         void write_board_piece_to_stream(const Position& pos, Piece pc);
 
