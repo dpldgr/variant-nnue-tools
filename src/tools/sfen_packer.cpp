@@ -405,7 +405,7 @@ namespace Stockfish::Tools {
     {
         // piece type
         PieceType pr = PieceType(pc == NO_PIECE ? NO_PIECE_TYPE : pos.variant()->pieceIndex[type_of(pc)] + 1);
-        auto c = huffman_tabl6[pr];
+        auto c = huffman_table[pr];
         stream.write_n_bit(c.code, c.bits);
 
         if (pc == NO_PIECE)
