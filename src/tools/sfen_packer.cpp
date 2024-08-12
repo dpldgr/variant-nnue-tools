@@ -106,9 +106,11 @@ namespace Stockfish::Tools {
 
         // Output the board pieces to stream.
         void write_board_piece_to_stream(const Position& pos, Piece pc);
+        void write_board_piece_to_stream_v2(const Position& pos, PieceCode pc);
 
         // Read one board piece from stream
         Piece read_board_piece_from_stream(const Position& pos);
+        PieceCode read_board_piece_from_stream_v2(const Position& pos);
     };
 
 
@@ -281,6 +283,16 @@ namespace Stockfish::Tools {
         }
         assert(false);
         return NO_PIECE;
+    }
+
+    void SfenPacker::write_board_piece_to_stream_v2(const Position& pos, PieceCode pc)
+    {
+        stream.write_n_bit(pc.code(), pc.bits());
+    }
+
+    PieceCode SfenPacker::read_board_piece_from_stream_v2(const Position& pos)
+    {
+        return PieceCode(stream.read_n_bit(PieceCode::piece_size));
     }
 
     int set_from_packed_sfen(Position& pos, const PackedSfen& sfen, StateInfo* si, Thread* th)
