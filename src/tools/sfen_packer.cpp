@@ -293,7 +293,7 @@ namespace Stockfish::Tools {
 
     PieceCode SfenPacker::read_board_piece_from_stream_v2(const Position& pos)
     {
-        return PieceCode(stream.read_n_bit(PieceCode::piece_size));
+        return PieceCode(stream.read_n_bit(PieceCode::code_size));
     }
 
     int set_from_packed_sfen(Position& pos, const PackedSfen& sfen, StateInfo* si, Thread* th)
