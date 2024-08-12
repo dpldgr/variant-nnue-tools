@@ -3,7 +3,7 @@
 
 namespace Stockfish
 {
-    int PieceCode::code_size = ceil(log2(2 * PIECE_TYPES));
+    int PieceCode::code_size = PIECE_TYPE_BITS + 1;
 
     static void PieceCode::calc_code_size(int type_count)
     {
