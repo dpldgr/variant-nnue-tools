@@ -494,7 +494,7 @@ namespace Stockfish::Tools {
 
         SfenPacker sp;
         sp.data = (uint8_t*)&sfen;
-        sp.pack(pos);
+        sp.pack_v2(pos);
 
         return sfen;
     }
