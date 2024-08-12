@@ -306,13 +306,13 @@ namespace Stockfish::Tools {
             stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
 
         // Write board occupancy.
-        for (Square i = max_sq ; i >= SQ_A1; i--)
+        for (Square i = max_sq ; i >= SQ_A1; --i)
         {
             stream.write_one_bit(pos.piece_on(from_variant_square(i,pos)) == NO_PIECE ? 1 : 0);
         }
 
         // Write piece codes.
-        for (Square i = max_sq; i >= SQ_A1; i--)
+        for (Square i = max_sq; i >= SQ_A1; --i)
         {
             PieceCode pcc = pos.piece_on(from_variant_square(i, pos));
 
