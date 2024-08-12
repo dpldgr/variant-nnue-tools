@@ -291,7 +291,7 @@ namespace Stockfish::Tools {
 
     void SfenPacker::pack_v2(const Position& pos)
     {
-        int max_sq = pos.ranks() * pos.files();
+        Square max_sq = to_variant_square(make_square(pos.max_file(),pos.max_rank()),pos);
 
         memset(data, 0, DATA_SIZE / 8 /* 512bit */);
         stream.set_data(data);
@@ -306,15 +306,15 @@ namespace Stockfish::Tools {
             stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
 
         // Write board occupancy.
-        for (int i = 0; i < max_sq; i++)
+        for (Square i = max_sq ; i >= SQ_A1; i--)
         {
-            stream.write_one_bit((pos.board[from_variant_square(i,pos)] ? 1 : 0), 1);
+            stream.write_one_bit(pos.piece_on(from_variant_square(i,pos)) == NO_PIECE ? 1 : 0);
         }
 
         // Write piece codes.
-        for (int i = 0; i <= max_sq; i++)
+        for (Square i = max_sq; i >= SQ_A1; i--)
         {
-            PieceCode pcc = pos.board[from_variant_square(i, pos)];
+            PieceCode pcc = pos.piece_on(from_variant_square(i, pos));
 
             if (pcc.is_piece())
             {
