@@ -54,6 +54,7 @@ SRCS = benchmark.cpp bitbase.cpp bitboard.cpp endgame.cpp evaluate.cpp main.cpp 
 	nnue/evaluate_nnue.cpp \
 	nnue/features/half_ka_v2.cpp \
 	tools/validate_training_data.cpp \
+	tools/piececode.cpp \
 	tools/sfen_packer.cpp \
 	tools/training_data_generator.cpp \
 	tools/training_data_generator_nonpv.cpp \
