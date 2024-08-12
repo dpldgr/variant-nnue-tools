@@ -1,6 +1,7 @@
 ﻿#include "sfen_packer.h"
 
 #include "packed_sfen.h"
+#include "piececode.h"
 
 #include "misc.h"
 #include "position.h"
