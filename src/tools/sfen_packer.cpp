@@ -107,11 +107,12 @@ namespace Stockfish::Tools {
 
         // Output the board pieces to stream.
         void write_board_piece_to_stream(const Position& pos, Piece pc);
-        void write_board_piece_to_stream_v2(const Position& pos, PieceCode pc);
 
         // Read one board piece from stream
         Piece read_board_piece_from_stream(const Position& pos);
-        PieceCode read_board_piece_from_stream_v2(const Position& pos);
+
+        void write_piece_code_to_stream_v2(const Position& pos, PieceCode pc);
+        PieceCode read_piece_code_from_stream_v2(const Position& pos);
     };
 
 
@@ -286,12 +287,82 @@ namespace Stockfish::Tools {
         return NO_PIECE;
     }
 
-    void SfenPacker::write_board_piece_to_stream_v2(const Position& pos, PieceCode pc)
+    void SfenPacker::pack_v2(const Position& pos)
+    {
+        int max_sq = pos.ranks() * pos.files();
+
+        memset(data, 0, DATA_SIZE / 8 /* 512bit */);
+        stream.set_data(data);
+
+        // turn
+        // Side to move.
+        stream.write_one_bit((int)(pos.side_to_move()));
+
+        // 7-bit positions for leading and trailing balls
+        // White king and black king, 6 bits for each.
+        for (auto c : Colors)
+            stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
+
+        // Write board occupancy.
+        for (int i = 0; i < max_sq; i++)
+        {
+            stream.write_one_bit((pos.board[from_variant_square(i,pos)] ? 1 : 0), 1);
+        }
+
+        // Write piece codes.
+        for (int i = 0; i <= max_sq; i++)
+        {
+            PieceCode pcc = pos.board[from_variant_square(i, pos)];
+
+            if (pcc.is_piece())
+            {
+                write_piece_code_to_stream(pos, pcc);
+            }
+        }
+
+        for (auto c : Colors)
+            for (PieceSet ps = pos.piece_types(); ps;)
+                stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), DATA_SIZE > 512 ? 7 : 5);
+
+        // TODO(someone): Support chess960.
+        stream.write_one_bit(pos.can_castle(WHITE_OO));
+        stream.write_one_bit(pos.can_castle(WHITE_OOO));
+        stream.write_one_bit(pos.can_castle(BLACK_OO));
+        stream.write_one_bit(pos.can_castle(BLACK_OOO));
+
+        if (!pos.ep_squares()) {
+            stream.write_one_bit(0);
+        }
+        else {
+            stream.write_one_bit(1);
+            // Additional ep squares (e.g., for berolina) are not encoded
+            stream.write_n_bit(static_cast<int>(to_variant_square(lsb(pos.ep_squares()), pos)), 7);
+        }
+
+        stream.write_n_bit(pos.state()->rule50, 6);
+
+        const int fm = 1 + (pos.game_ply() - (pos.side_to_move() == BLACK)) / 2;
+        stream.write_n_bit(fm, 8);
+
+        // Write high bits of half move. This is a fix for the
+        // limited range of half move counter.
+        // This is backwards compatible.
+        stream.write_n_bit(fm >> 8, 8);
+
+        // Write the highest bit of rule50 at the end. This is a backwards
+        // compatible fix for rule50 having only 6 bits stored.
+        // This bit is just ignored by the old parsers.
+        stream.write_n_bit(pos.state()->rule50 >> 6, 1);
+
+        assert(stream.get_cursor() <= DATA_SIZE);
+    }
+
+    void SfenPacker::write_piece_code_to_stream(const Position& pos, PieceCode pc)
     {
         stream.write_n_bit(pc.code(), pc.bits());
     }
 
-    PieceCode SfenPacker::read_board_piece_from_stream_v2(const Position& pos)
+    PieceCode SfenPacker::read_piece_code_from_stream(const Position& pos)
     {
         return PieceCode(stream.read_n_bit(PieceCode::code_size));
     }
