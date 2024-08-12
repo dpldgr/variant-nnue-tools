@@ -111,8 +111,10 @@ namespace Stockfish::Tools {
         // Read one board piece from stream
         Piece read_board_piece_from_stream(const Position& pos);
 
-        void write_piece_code_to_stream_v2(const Position& pos, PieceCode pc);
-        PieceCode read_piece_code_from_stream_v2(const Position& pos);
+        // PieceCode related functions.
+        void pack_v2(const Position& pos);
+        void write_piece_code_to_stream(const Position& pos, PieceCode pc);
+        PieceCode read_piece_code_from_stream(const Position& pos);
     };
 
 
