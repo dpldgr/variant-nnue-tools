@@ -16,6 +16,8 @@ using namespace std;
 
 namespace Stockfish::Tools {
 
+    int PieceCode::code_size = PIECE_TYPE_BITS + 1;
+
     // Class that handles bitstream
     // useful when doing aspect encoding
     struct BitStream
