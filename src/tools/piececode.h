@@ -15,9 +15,9 @@ namespace Stockfish::Tools
     public:
         static int code_size;
 
-        void calc_code_size(int type_count)
+        static void calc_code_size(int type_count)
         {
-            code_size = ceil(log2(type_count));
+            code_size = ceil(log2(type_count * 2));
         }
 
         PieceCode()
@@ -35,23 +35,27 @@ namespace Stockfish::Tools
             : _bits(code_size)
         {
             PieceType pt = type_of(pc);
-            Color c = color_of(pc);
 
             if (pt == NO_PIECE_TYPE)
             {
                 _is_piece = false;
                 _code = 0;
             }
-            else if (pt == KING)
-            {
-                _is_king = true;
-                _is_piece = true;
-                _code = (c << (_bits - 1));
-            }
             else
             {
-                _is_piece = true;
-                _code = (c << (_bits - 1)) | pt;
+                Color c = color_of(pc);
+
+                if (pt == KING)
+                {
+                    _is_king = true;
+                    _is_piece = true;
+                    _code = (c << (_bits - 1));
+                }
+                else
+                {
+                    _is_piece = true;
+                    _code = (c << (_bits - 1)) | pt;
+                }
             }
         }
 
@@ -63,39 +67,46 @@ namespace Stockfish::Tools
                 _is_piece = false;
                 _code = 0;
             }
-            else if (pt == KING)
-            {
-                _is_king = true;
-                _is_piece = true;
-                _code = (c << (_bits - 1));
-            }
             else
             {
-                _is_piece = true;
-                _code = (c << (_bits - 1)) | pt;
+                if (pt == KING)
+                {
+                    _is_king = true;
+                    _is_piece = true;
+                    _code = (c << (_bits - 1));
+                }
+                else
+                {
+                    _is_piece = true;
+                    _code = (c << (_bits - 1)) | pt;
+                }
             }
         }
 
         PieceCode& operator=(Piece pc)
         {
             PieceType pt = type_of(pc);
-            Color c = color_of(pc);
 
             if (pt == NO_PIECE_TYPE)
             {
                 _is_piece = false;
                 _code = 0;
             }
-            else if (pt == KING)
-            {
-                _is_king = true;
-                _is_piece = true;
-                _code = (c << (_bits - 1));
-            }
             else
             {
-                _is_piece = true;
-                _code = (c << (_bits - 1)) | pt;
+                Color c = color_of(pc);
+
+                if (pt == KING)
+                {
+                    _is_king = true;
+                    _is_piece = true;
+                    _code = (c << (_bits - 1));
+                }
+                else
+                {
+                    _is_piece = true;
+                    _code = (c << (_bits - 1)) | pt;
+                }
             }
 
             return *this;
@@ -118,16 +129,21 @@ namespace Stockfish::Tools
                 _is_piece = false;
                 _code = 0;
             }
-            else if (pt == KING)
-            {
-                _is_king = true;
-                _is_piece = true;
-                _code = (c() << (_bits - 1));
-            }
             else
             {
-                _is_piece = true;
-                _code = (c() << (_bits - 1)) | pt;
+                Color _c = c();
+
+                if (pt == KING)
+                {
+                    _is_king = true;
+                    _is_piece = true;
+                    _code = (_c << (_bits - 1));
+                }
+                else
+                {
+                    _is_piece = true;
+                    _code = (_c << (_bits - 1)) | pt;
+                }
             }
 
             return *this;

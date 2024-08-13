@@ -87,28 +87,28 @@ public:
 
   Pawns::Table pawnsTable;
   Material::Table materialTable;
-  size_t pvIdx, pvLast;
-  uint64_t ttHitAverage;
-  int selDepth, nmpMinPly;
-  Color nmpColor;
+  size_t pvIdx = 0, pvLast = 0;
+  uint64_t ttHitAverage = 0;
+  int selDepth = 0, nmpMinPly = 0;
+  Color nmpColor = WHITE;
   std::atomic<uint64_t> nodes, tbHits, bestMoveChanges;
 
   Position rootPos;
   StateInfo rootState;
   Search::RootMoves rootMoves;
-  Depth rootDepth, completedDepth;
+  Depth rootDepth = 0, completedDepth = 0;
   CounterMoveHistory counterMoves;
   ButterflyHistory mainHistory;
   GateHistory gateHistory;
   LowPlyHistory lowPlyHistory;
   CapturePieceToHistory captureHistory;
   ContinuationHistory continuationHistory[2][2];
-  int failedHighCnt;
-  bool rootInTB;
-  int Cardinality;
-  bool UseRule50;
-  Depth ProbeDepth;
-  Score trend;
+  int failedHighCnt = 0;
+  bool rootInTB = false;
+  int Cardinality = 0;
+  bool UseRule50 = false;
+  Depth ProbeDepth = 0;
+  Score trend = SCORE_ZERO;
 };
 
 

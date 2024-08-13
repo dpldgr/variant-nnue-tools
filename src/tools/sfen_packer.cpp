@@ -115,7 +115,6 @@ namespace Stockfish::Tools {
 
         // PieceCode related functions.
         void pack_v2(const Position& pos);
-        void write_piece_code_to_stream(const Position& pos, PieceCode pc);
         PieceCode read_piece_code_from_stream(const Position& pos);
     };
 
@@ -293,42 +292,52 @@ namespace Stockfish::Tools {
 
     void SfenPacker::pack_v2(const Position& pos)
     {
-        Square max_sq = to_variant_square(make_square(pos.max_file(),pos.max_rank()),pos);
+        const Square max_sq = to_variant_square(pos.max_square(),pos);
+        PieceCode::calc_code_size(pos.piece_types_count());
 
         memset(data, 0, DATA_SIZE / 8 /* 512bit */);
         stream.set_data(data);
 
-        // turn
-        // Side to move.
-        stream.write_one_bit((int)(pos.side_to_move()));
+        // Encodes both side to move and game ply.
+        const int ply_count = pos.ply_from_start();
+        stream.write_n_bit(ply_count, 16);
 
+        /* TODO: decide whether or not to leave this out and decode location in trainer.
         // 7-bit positions for leading and trailing balls
         // White king and black king, 6 bits for each.
         for (auto c : Colors)
             stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
+        //*/
 
         // Write board occupancy.
-        for (Square i = max_sq ; i >= SQ_A1; --i)
+        for (Square i = SQ_A1; i <= max_sq; ++i)
         {
-            stream.write_one_bit(pos.piece_on(from_variant_square(i,pos)) == NO_PIECE ? 1 : 0);
+            Square sq = from_variant_square(i, pos);
+            Piece pc = pos.piece_on(sq);
+            stream.write_one_bit( pc == NO_PIECE ? 0 : 1);
         }
 
         // Write piece codes.
-        for (Square i = max_sq; i >= SQ_A1; --i)
+        for (Square i = SQ_A1; i <= max_sq; ++i)
         {
-            PieceCode pcc = pos.piece_on(from_variant_square(i, pos));
+            Square sq = from_variant_square(i, pos);
+            Piece pc = pos.piece_on(sq);
+            PieceCode pcc = pc;
 
             if (pcc.is_piece())
             {
-                write_piece_code_to_stream(pos, pcc);
+                stream.write_n_bit(pcc.code(), pcc.bits());
             }
         }
 
-        for (auto c : Colors)
-            for (PieceSet ps = pos.piece_types(); ps;)
-                stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), DATA_SIZE > 512 ? 7 : 5);
+        // Write out pieces in hand only if drops are enabled?
+        if (pos.variant()->freeDrops == true)
+        {
+            for (auto c : Colors)
+                for (PieceSet ps = pos.piece_types(); ps;)
+                    stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), DATA_SIZE > 512 ? 7 : 5);
+        }
 
-        // TODO(someone): Support chess960.
         stream.write_one_bit(pos.can_castle(WHITE_OO));
         stream.write_one_bit(pos.can_castle(WHITE_OOO));
         stream.write_one_bit(pos.can_castle(BLACK_OO));
@@ -343,27 +352,9 @@ namespace Stockfish::Tools {
             stream.write_n_bit(static_cast<int>(to_variant_square(lsb(pos.ep_squares()), pos)), 7);
         }
 
-        stream.write_n_bit(pos.state()->rule50, 6);
-
-        const int fm = 1 + (pos.game_ply() - (pos.side_to_move() == BLACK)) / 2;
-        stream.write_n_bit(fm, 8);
-
-        // Write high bits of half move. This is a fix for the
-        // limited range of half move counter.
-        // This is backwards compatible.
-        stream.write_n_bit(fm >> 8, 8);
-
-        // Write the highest bit of rule50 at the end. This is a backwards
-        // compatible fix for rule50 having only 6 bits stored.
-        // This bit is just ignored by the old parsers.
-        stream.write_n_bit(pos.state()->rule50 >> 6, 1);
+        stream.write_n_bit(pos.rule50_count(), 8);
 
         assert(stream.get_cursor() <= DATA_SIZE);
-    }
-
-    void SfenPacker::write_piece_code_to_stream(const Position& pos, PieceCode pc)
-    {
-        stream.write_n_bit(pc.code(), pc.bits());
     }
 
     PieceCode SfenPacker::read_piece_code_from_stream(const Position& pos)

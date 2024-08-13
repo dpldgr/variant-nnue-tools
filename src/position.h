@@ -123,12 +123,14 @@ public:
   const Variant* variant() const;
   Rank max_rank() const;
   File max_file() const;
+  Square max_square() const;
   int ranks() const;
   int files() const;
   bool two_boards() const;
   Bitboard board_bb() const;
   Bitboard board_bb(Color c, PieceType pt) const;
   PieceSet piece_types() const;
+  int piece_types_count() const;
   const std::string& piece_to_char() const;
   const std::string& piece_to_char_synonyms() const;
   Bitboard promotion_zone(Color c) const;
@@ -310,6 +312,7 @@ public:
   // Other properties of the position
   Color side_to_move() const;
   int game_ply() const;
+  int ply_from_start() const;
   bool is_chess960() const;
   Thread* this_thread() const;
   bool is_immediate_game_end() const;
@@ -421,6 +424,11 @@ inline File Position::max_file() const {
   return var->maxFile;
 }
 
+inline Square Position::max_square() const {
+    assert(var != nullptr);
+    return make_square(var->maxFile, var->maxRank);
+}
+
 inline int Position::ranks() const {
   assert(var != nullptr);
   return var->maxRank + 1;
@@ -449,6 +457,11 @@ inline Bitboard Position::board_bb(Color c, PieceType pt) const {
 inline PieceSet Position::piece_types() const {
   assert(var != nullptr);
   return var->pieceTypes;
+}
+
+inline int Position::piece_types_count() const {
+  assert(var != nullptr);
+  return popcount(var->pieceTypes);
 }
 
 inline const std::string& Position::piece_to_char() const {
@@ -1369,6 +1382,10 @@ inline Value Position::non_pawn_material() const {
 
 inline int Position::game_ply() const {
   return gamePly;
+}
+
+inline int Position::ply_from_start() const {
+  return gamePly - 1;
 }
 
 inline int Position::board_honor_counting_ply(int countStarted) const {
