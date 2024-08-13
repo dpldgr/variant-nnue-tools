@@ -738,7 +738,7 @@ namespace Stockfish::Tools
 
         // Add a random number to the end of the file name.
         bool random_file_name = false;
-        std::string sfen_format = "binpack";
+        std::string sfen_format = "bin2";
 
         string token;
         while (true)
@@ -823,6 +823,8 @@ namespace Stockfish::Tools
                 params.sfen_format = SfenOutputType::Bin;
             else if (sfen_format == "binpack")
                 params.sfen_format = SfenOutputType::Binpack;
+            else if (sfen_format == "bin2")
+                params.sfen_format = SfenOutputType::Bin2;
             else
                 cout << "WARNING: Unknown sfen format `" << sfen_format << "`. Using bin\n";
         }

@@ -15,7 +15,8 @@ namespace Stockfish::Tools {
     enum struct SfenOutputType
     {
         Bin,
-        Binpack
+        Binpack,
+        Bin2,
     };
 
     static bool ends_with(const std::string& lhs, const std::string& end)
@@ -63,7 +64,7 @@ namespace Stockfish::Tools {
         std::optional<PackedSfenValue> next() override
         {
             PackedSfenValue e;
-            if(m_stream.read(reinterpret_cast<char*>(&e), sizeof(PackedSfenValue)))
+            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(PackedSfenValue)))
             {
                 return e;
             }
@@ -80,6 +81,44 @@ namespace Stockfish::Tools {
         }
 
         ~BinSfenInputStream() override {}
+
+    private:
+        std::fstream m_stream;
+        bool m_eof;
+    };
+
+    struct Bin2InputStream : BasicSfenInputStream
+    {
+        static constexpr auto openmode = std::ios::in | std::ios::binary;
+        static inline const std::string extension = "bin";
+
+        Bin2InputStream(std::string filename) :
+            m_stream(filename, openmode),
+            m_eof(!m_stream)
+        {
+        }
+
+        // TODO: update to read new bin2 format.
+        std::optional<PackedSfenValue> next() override
+        {
+            PackedSfenValue e;
+            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(PackedSfenValue)))
+            {
+                return e;
+            }
+            else
+            {
+                m_eof = true;
+                return std::nullopt;
+            }
+        }
+
+        bool eof() const override
+        {
+            return m_eof;
+        }
+
+        ~Bin2InputStream() override {}
 
     private:
         std::fstream m_stream;
@@ -155,6 +194,41 @@ namespace Stockfish::Tools {
         std::fstream m_stream;
     };
 
+    struct Bin2OutputStream : BasicSfenOutputStream
+    {
+        static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
+        static inline const std::string extension = "bin2";
+
+        Bin2OutputStream(std::string filename) :
+            m_stream(filename_with_extension(filename, extension), openmode)
+        {
+        }
+
+        void write(const PSVector& sfens) override
+        {
+            for (auto& sfen : sfens)
+            {
+                int i = (DATA_SIZE / 8) - 1;
+
+                for (; i >= 0; i--)
+                {
+                    if (sfen.sfen.data[i] != 0)
+                        break;
+                }
+
+                int write_size = 7 + i;
+
+                m_stream.write(reinterpret_cast<const char*>(&write_size), 1);
+                m_stream.write(reinterpret_cast<const char*>(&sfen), write_size);
+            }
+        }
+
+        ~Bin2OutputStream() override {}
+
+    private:
+        std::fstream m_stream;
+    };
+
     struct BinpackSfenOutputStream : BasicSfenOutputStream
     {
         static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
@@ -190,6 +264,8 @@ namespace Stockfish::Tools {
             return std::make_unique<BinSfenInputStream>(filename);
         else if (has_extension(filename, BinpackSfenInputStream::extension))
             return std::make_unique<BinpackSfenInputStream>(filename);
+        else if (has_extension(filename, Bin2InputStream::extension))
+            return std::make_unique<Bin2InputStream>(filename);
 
         return nullptr;
     }
@@ -202,6 +278,8 @@ namespace Stockfish::Tools {
                 return std::make_unique<BinSfenOutputStream>(filename);
             case SfenOutputType::Binpack:
                 return std::make_unique<BinpackSfenOutputStream>(filename);
+            case SfenOutputType::Bin2:
+                return std::make_unique<Bin2OutputStream>(filename);
         }
 
         assert(false);
@@ -214,6 +292,8 @@ namespace Stockfish::Tools {
             return std::make_unique<BinSfenOutputStream>(filename);
         else if (has_extension(filename, BinpackSfenOutputStream::extension))
             return std::make_unique<BinpackSfenOutputStream>(filename);
+        else if (has_extension(filename, Bin2OutputStream::extension))
+            return std::make_unique<Bin2OutputStream>(filename);
 
         return nullptr;
     }

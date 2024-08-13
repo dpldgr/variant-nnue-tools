@@ -14,9 +14,6 @@ namespace Stockfish::Tools {
     // For the time being, write all the following members regardless of the options.
     struct PackedSfenValue
     {
-        // phase
-        PackedSfen sfen;
-
         // Evaluation value returned from Tools::search()
         std::int16_t score;
 
@@ -33,11 +30,13 @@ namespace Stockfish::Tools {
         // Only write if LEARN_GENSFEN_DRAW_RESULT is enabled.
         std::int8_t game_result;
 
+        // phase
+        PackedSfen sfen;
+
         // When exchanging the file that wrote the teacher aspect with other people
         //Because this structure size is not fixed, pad it so that it is 72 bytes in any environment.
         std::uint8_t padding;
-
-        // 64 + 2 + 2 + 2 + 1 + 1 = 72bytes
+        // 2 + 2 + 2 + 1 + 64 + 1 = 72bytes
     };
 
     // Phase array: PSVector stands for packed sfen vector.
