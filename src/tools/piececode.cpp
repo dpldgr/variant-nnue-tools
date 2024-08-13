@@ -1,7 +1,7 @@
 #include <cmath>
 #include "piececode.h"
 
-namespace Stockfish
+namespace Stockfish::Tools
 {
     int PieceCode::code_size = PIECE_TYPE_BITS + 1;
 
