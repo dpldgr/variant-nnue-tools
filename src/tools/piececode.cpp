@@ -5,7 +5,7 @@ namespace Stockfish
 {
     int PieceCode::code_size = PIECE_TYPE_BITS + 1;
 
-    static void PieceCode::calc_code_size(int type_count)
+    void PieceCode::calc_code_size(int type_count)
     {
         code_size = ceil(log2(type_count));
     }
@@ -153,17 +153,17 @@ namespace Stockfish
         return ret;
     }
 
-    inline operator PieceCode::Piece() const
+    inline PieceCode::operator Piece() const
     {
         return pc();
     }
 
-    inline operator PieceCode::PieceType() const
+    inline PieceCode::operator PieceType() const
     {
         return pt();
     }
 
-    inline operator PieceCode::Color() const
+    inline PieceCode::operator Color() const
     {
         return c();
     }
