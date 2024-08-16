@@ -34,6 +34,7 @@
 
 #include "nnue/nnue_accumulator.h"
 
+#include "tools/poscodec.h"
 #include "tools/packed_sfen.h"
 #include "tools/sfen_packer.h"
 
@@ -90,6 +91,12 @@ struct StateInfo {
   // Used by NNUE
   Eval::NNUE::Accumulator accumulator;
   DirtyPiece dirtyPiece;
+
+  void clear() {
+      std::memset(this, 0, sizeof(StateInfo));
+      accumulator.computed[WHITE] = false;
+      accumulator.computed[BLACK] = false;
+  }
 };
 
 
@@ -105,6 +112,8 @@ typedef std::unique_ptr<std::deque<StateInfo>> StateListPtr;
 /// do_move() and undo_move(), used by the search to update node info when
 /// traversing the search tree.
 class Thread;
+
+class CodecHelper;
 
 class Position {
 public:
@@ -124,6 +133,8 @@ public:
   Rank max_rank() const;
   File max_file() const;
   Square max_square() const;
+  Square to_variant_square(Square s) const;
+  Square from_variant_square(Square s) const;
   int ranks() const;
   int files() const;
   bool two_boards() const;
@@ -405,6 +416,43 @@ private:
   void drop_piece(Piece pc_hand, Piece pc_drop, Square s);
   void undrop_piece(Piece pc_hand, Square s);
   Bitboard find_drop_region(Direction dir, Square s, Bitboard occupied) const;
+
+  friend class CodecHelper;
+};
+
+struct CodecHelper
+{
+    Position* pos;
+
+    CodecHelper(Position* p, StateInfo* s, const Variant* v)
+        :pos(0)
+    {
+        assert(p != nullptr);
+        assert(s != nullptr);
+        assert(v != nullptr);
+        this->pos = p;
+        p->clear();
+        s->clear();
+        p->st = s;
+        p->var = v;
+        p->st->castlingKingSquare[WHITE] = p->st->castlingKingSquare[BLACK] = SQ_NONE;
+    }
+
+    void set_castle(CastlingRights cr) {
+        assert(pos->st != nullptr);
+        pos->st->castlingRights = (pos->st->castlingRights & ~cr) | cr;
+    }
+
+    void set_ep_squares(Square ep_square) {
+        assert(pos->st != nullptr);
+        pos->st->epSquares = square_bb(ep_square);
+    }
+
+    void n_move_rule(int count)
+    {
+        assert(pos->st != nullptr);
+        pos->st->rule50 = count;
+    }
 };
 
 extern std::ostream& operator<<(std::ostream& os, const Position& pos);
@@ -427,6 +475,14 @@ inline File Position::max_file() const {
 inline Square Position::max_square() const {
     assert(var != nullptr);
     return make_square(var->maxFile, var->maxRank);
+}
+
+inline Square Position::to_variant_square(Square s ) const {
+    return Square(s - rank_of(s) * (FILE_MAX - max_file()));
+}
+
+inline Square Position::from_variant_square(Square s) const {
+    return Square(s + s / files() * (FILE_MAX - max_file()));
 }
 
 inline int Position::ranks() const {

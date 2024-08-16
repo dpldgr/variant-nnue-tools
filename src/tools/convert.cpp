@@ -4,6 +4,7 @@
 #include "misc.h"
 #include "thread.h"
 #include "position.h"
+#include "variant.h"
 #include "tt.h"
 
 #include "extra/nnue_data_binpack_format.h"
@@ -11,6 +12,9 @@
 #include "nnue/evaluate_nnue.h"
 
 #include "syzygy/tbprobe.h"
+
+#include "bitstream.h"
+#include "piececode.h"
 
 #include <sstream>
 #include <fstream>
@@ -503,6 +507,7 @@ namespace Stockfish::Tools
     static inline const std::string plain_extension = ".plain";
     static inline const std::string bin_extension = ".bin";
     static inline const std::string binpack_extension = ".binpack";
+    static inline const std::string bin2_extension = ".bin2";
 
     static bool file_exists(const std::string& name)
     {
@@ -525,6 +530,541 @@ namespace Stockfish::Tools
     {
         return ends_with(input_path, expected_input_extension)
             && ends_with(output_path, expected_output_extension);
+    }
+
+    class PosCodec
+    {
+    public:
+        static PosCodec* get_codec(const std::string& path)
+        {
+            if (ends_with(path, plain_extension))
+                return new PlainCodec();
+            else if (ends_with(path, bin_extension))
+                return new BinCodec();
+            else if (ends_with(path, bin2_extension))
+                return new Bin2Codec();
+            else
+                return nullptr;
+        }
+
+        static PosCodec* get_codec_ext(const std::string& ext)
+        {
+            if (ext == plain_extension)
+                return new PlainCodec();
+            else if (ext == bin_extension)
+                return new BinCodec();
+            else if (ext == bin2_extension)
+                return new Bin2Codec();
+            else
+                return nullptr;
+        }
+
+        static PosCodec* get_codec_type(const SfenOutputType type)
+        {
+            if (type == SfenOutputType::Bin)
+                return new BinCodec();
+            else if (type == SfenOutputType::Bin2)
+                return new Bin2Codec();
+            else
+                return nullptr;
+        }
+
+        virtual bool is_decoder() { return false; };
+        virtual bool is_encoder() { return false; };
+
+        virtual void operator=(const vector<uint8_t>& data) = 0;
+        virtual operator vector<uint8_t>() const = 0;
+        virtual void encode(const Position& pos) = 0;
+        virtual void decode(Position& pos) = 0;
+        virtual std::string name() const = 0;
+        virtual std::string ext() const = 0;
+
+        virtual void writeHeader() {};
+        virtual void readHeader() {};
+        virtual void writePosition() {};
+        virtual void readPosition() {};
+    };
+
+    class PlainCodec : public PosCodec
+    {
+    private:
+    public:
+        virtual bool is_decoder() { return true; };
+        virtual bool is_encoder() { return true; };
+        virtual std::string name() const { return "PLAIN"; }
+        virtual std::string ext() const { return ".plain"; }
+
+        virtual void operator=(const vector<uint8_t>& data)
+        {
+            // TODO.
+        }
+
+        virtual operator vector<uint8_t>() const
+        {
+            // TODO.
+
+            return vector<uint8_t>();
+        }
+
+        virtual void encode(const Position& pos)
+        {
+            // TODO.
+        }
+
+        virtual void decode(Position& pos)
+        {
+            // TODO.
+        }
+    };
+
+    class Bin2Codec : public PosCodec
+    {
+    private:
+        BitStream stream;
+        uint8_t data[BIN2_DATA_SIZE];
+    public:
+        virtual bool is_decoder() { return true; };
+        virtual bool is_encoder() { return true; };
+        virtual std::string name() const { return "BIN2"; }
+        virtual std::string ext() const { return ".bin2"; }
+
+        virtual void operator=(const vector<uint8_t>& d)
+        {
+            std::copy(d.begin(), d.end(), data);
+        }
+
+        virtual operator vector<uint8_t>() const
+        {
+            // TODO.
+
+            return vector<uint8_t>();
+        }
+
+        virtual void encode(const Position& pos)
+        {
+            const Square max_sq = pos.to_variant_square(pos.max_square());
+            PieceCode::calc_code_size(pos.piece_types_count());
+
+            // TODO: change to std::vector.
+            memset(data, 0, BIN2_DATA_SIZE / 8 /* 2048 bits */);
+            stream.set_data(data);
+
+            // Encodes both side to move and game ply.
+            const int ply_count = pos.ply_from_start();
+            stream.write_n_bit(ply_count, 16);
+
+            /* TODO: decide whether or not to leave this out and decode location in trainer.
+            // 7-bit positions for leading and trailing balls
+            // White king and black king, 6 bits for each.
+            for (auto c : Colors)
+                stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
+            //*/
+
+            // Write board occupancy.
+            for (Square i = SQ_A1; i <= max_sq; ++i)
+            {
+                Square sq = pos.from_variant_square(i);
+                Piece pc = pos.piece_on(sq);
+                stream.write_one_bit(pc == NO_PIECE ? 0 : 1);
+            }
+
+            // Write piece codes.
+            for (Square i = SQ_A1; i <= max_sq; ++i)
+            {
+                Square sq = pos.from_variant_square(i);
+                Piece pc = pos.piece_on(sq);
+                PieceCode pcc = pc;
+
+                if (pcc.is_piece())
+                {
+                    stream.write_n_bit(pcc.code(), pcc.bits());
+                }
+            }
+
+            // Write out pieces in hand only if drops are enabled?
+            if (pos.variant()->freeDrops == true)
+            {
+                for (auto c : Colors)
+                    for (PieceSet ps = pos.piece_types(); ps;)
+                        stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), 7);
+            }
+
+            stream.write_n_bit(pos.rule50_count(), 8);
+
+            /* FIXME: Ignoring castling and en passant for now.
+            stream.write_one_bit(pos.can_castle(WHITE_OO));
+            stream.write_one_bit(pos.can_castle(WHITE_OOO));
+            stream.write_one_bit(pos.can_castle(BLACK_OO));
+            stream.write_one_bit(pos.can_castle(BLACK_OOO));
+
+            if (!pos.ep_squares()) {
+                stream.write_one_bit(0);
+            }
+            else {
+                stream.write_one_bit(1);
+                // Additional ep squares (e.g., for berolina) are not encoded
+                stream.write_n_bit(static_cast<int>(pos.to_variant_square(lsb(pos.ep_squares()))), 7);
+            }
+            //*/
+
+            assert(stream.get_cursor() <= BIN2_DATA_SIZE);
+        }
+
+        virtual void decode(Position& pos)
+        {
+            const Variant* v = variants.find(Options["UCI_Variant"])->second;
+            StateInfo si;
+            const Square max_sq = (Square)63;
+            PieceCode board[max_sq+1];
+            //Piece board_pc[max_sq+1];
+            CodecHelper hlp(&pos, &si, v);
+
+            stream.set_data(data);
+            const int ply_count = stream.read_n_bit(16);
+
+            // Read board occupancy.
+            for (Square i = SQ_A1; i <= max_sq; ++i)
+            {
+                bool build = (bool)stream.read_one_bit();
+                board[i].build_piece(build);
+            }
+
+            // Read piece codes.
+            for (Square i = SQ_A1; i <= max_sq; ++i)
+            {
+                if (board[i].is_piece())
+                {
+                    int code = stream.read_n_bit(PieceCode::code_size);
+                    board[i].build_piece(code);
+                    pos.put_piece(board[i], i);
+                    //board_pc[i] = board[i];
+                    //pos.put_piece(board_pc[i], i);
+                }
+                /*
+                else
+                {
+                    board_pc[i] = NO_PIECE;
+                }
+                //*/
+            }
+
+            hlp.n_move_rule(stream.read_n_bit(8));
+
+            /* FIXME: Ignoring castling and en passant for now.
+            // Castling availability.
+            if (stream.read_one_bit()) { hlp.set_castle(WHITE_OO);}
+            if (stream.read_one_bit()) { hlp.set_castle(WHITE_OOO); }
+            if (stream.read_one_bit()) { hlp.set_castle(BLACK_OO); }
+            if (stream.read_one_bit()) { hlp.set_castle(BLACK_OOO); }
+
+            // En passant square.
+            // TODO: fix this so an arbitrary number of ep squares are possible?
+            if (stream.read_one_bit()) {
+                hlp.set_ep_squares(static_cast<Square>(stream.read_n_bit(7)));
+            }
+            //*/
+        }
+    };
+
+    class BinCodec: public PosCodec
+    {
+    private:
+        BitStream stream;
+        std::array<uint8_t, DATA_SIZE / 8 + 8> data;
+        //uint8_t data[DATA_SIZE/8+8];
+    public:
+        virtual bool is_decoder() { return true; };
+        virtual bool is_encoder() { return true; };
+        virtual std::string name() const { return "BIN"; }
+        virtual std::string ext() const { return ".bin"; }
+
+        virtual void operator=(const vector<uint8_t>& data)
+        {
+            // TODO.
+        }
+
+        virtual operator vector<uint8_t>() const
+        {
+            vector<uint8_t> ret;
+
+            ret.insert(ret.end(), data.begin(), data.end());
+
+            return ret;
+        }
+
+        virtual void encode(const Position& pos)
+        {
+            //std::memset(data, 0, DATA_SIZE / 8 /* 512bit */);
+            stream.set_data(data.data());
+
+            // turn
+            // Side to move.
+            stream.write_one_bit((int)(pos.side_to_move()));
+
+            // 7-bit positions for leading and trailing balls
+            // White king and black king, 6 bits for each.
+            for (auto c : Colors)
+                stream.write_n_bit(pos.nnue_king() ? pos.to_variant_square(pos.king_square(c)) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
+
+            // Write the pieces on the board other than the kings.
+            for (Rank r = pos.max_rank(); r >= RANK_1; --r)
+            {
+                for (File f = FILE_A; f <= pos.max_file(); ++f)
+                {
+                    Piece pc = pos.piece_on(make_square(f, r));
+                    if (pos.nnue_king() && type_of(pc) == pos.nnue_king())
+                        continue;
+                    write_board_piece_to_stream(pos, pc);
+                }
+            }
+
+            for (auto c : Colors)
+                for (PieceSet ps = pos.piece_types(); ps;)
+                    stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), DATA_SIZE > 512 ? 7 : 5);
+
+            // TODO(someone): Support chess960.
+            stream.write_one_bit(pos.can_castle(WHITE_OO));
+            stream.write_one_bit(pos.can_castle(WHITE_OOO));
+            stream.write_one_bit(pos.can_castle(BLACK_OO));
+            stream.write_one_bit(pos.can_castle(BLACK_OOO));
+
+            if (!pos.ep_squares()) {
+                stream.write_one_bit(0);
+            }
+            else {
+                stream.write_one_bit(1);
+                // Additional ep squares (e.g., for berolina) are not encoded
+                stream.write_n_bit(static_cast<int>(pos.to_variant_square(lsb(pos.ep_squares()))), 7);
+            }
+
+            stream.write_n_bit(pos.state()->rule50, 6);
+
+            const int fm = 1 + (pos.game_ply() - (pos.side_to_move() == BLACK)) / 2;
+            stream.write_n_bit(fm, 8);
+
+            // Write high bits of half move. This is a fix for the
+            // limited range of half move counter.
+            // This is backwards compatible.
+            stream.write_n_bit(fm >> 8, 8);
+
+            // Write the highest bit of rule50 at the end. This is a backwards
+            // compatible fix for rule50 having only 6 bits stored.
+            // This bit is just ignored by the old parsers.
+            stream.write_n_bit(pos.state()->rule50 >> 6, 1);
+
+            assert(stream.get_cursor() <= DATA_SIZE);
+        }
+
+        virtual void decode(Position& pos)
+        {
+            // TODO.
+        }
+
+    private:
+        struct HuffmanedPiece
+        {
+            int code; // how it will be coded
+            int bits; // How many bits do you have
+        };
+
+        const HuffmanedPiece huffman_table[17] =
+        {
+            {0b00000,1}, // NO_PIECE
+            {0b00001,5}, // PAWN
+            {0b00011,5}, // KNIGHT
+            {0b00101,5}, // BISHOP
+            {0b00111,5}, // ROOK
+            {0b01001,5}, // QUEEN
+            {0b01011,5}, //
+            {0b01101,5}, //
+            {0b01111,5}, //
+            {0b10001,5}, //
+            {0b10011,5}, //
+            {0b10101,5}, //
+            {0b10111,5}, //
+            {0b11001,5}, //
+            {0b11011,5}, //
+            {0b11101,5}, //
+            {0b11111,5}, //
+        };
+
+        // Output the board pieces to stream.
+        void write_board_piece_to_stream(const Position& pos, Piece pc)
+        {
+            // piece type
+            PieceType pr = PieceType(pc == NO_PIECE ? NO_PIECE_TYPE : pos.variant()->pieceIndex[type_of(pc)] + 1);
+            auto c = huffman_table[pr];
+            stream.write_n_bit(c.code, c.bits);
+
+            if (pc == NO_PIECE)
+                return;
+
+            // first and second flag
+            stream.write_one_bit(color_of(pc));
+        }
+
+        // Read one board piece from stream
+        Piece read_board_piece_from_stream(const Position& pos)
+        {
+            PieceType pr = NO_PIECE_TYPE;
+            int code = 0, bits = 0;
+            while (true)
+            {
+                code |= stream.read_one_bit() << bits;
+                ++bits;
+
+                assert(bits <= 6);
+
+                for (pr = NO_PIECE_TYPE; pr <= 16; ++pr)
+                    if (huffman_table[pr].code == code
+                        && huffman_table[pr].bits == bits)
+                        goto Found;
+            }
+        Found:;
+            if (pr == NO_PIECE_TYPE)
+                return NO_PIECE;
+
+            // first and second flag
+            Color c = (Color)stream.read_one_bit();
+
+            for (PieceSet ps = pos.piece_types(); ps;)
+            {
+                PieceType pt = pop_lsb(ps);
+                if (pos.variant()->pieceIndex[pt] + 1 == pr)
+                    return make_piece(c, pt);
+            }
+            assert(false);
+            return NO_PIECE;
+        }
+    };
+
+    inline void convert(PosCodec& format1, vector<uint8_t>& data1, PosCodec& format2, vector<uint8_t>& data2)
+    {
+        Position pos;
+
+        format1 = data1;
+        format1.decode(pos);
+        format2.encode(pos);
+        data2 = format2;
+    }
+
+    inline void convert(PosCodec& format_in, PosCodec& format_out, std::string inputPath, std::string outputPath, std::ios_base::openmode om, bool validate)
+    {
+        std::array<uint8_t, 256> buf;
+        constexpr std::size_t bufferSize = 1024 * 1024;
+
+        std::cout << "Converting from " << format_in.name() << " to " << format_out.name() << ".\n";
+        std::cout << " Input file: " << inputPath << "\n";
+        std::cout << "Output file: " << outputPath << "\n";
+        std::cout << "WARNING: not fully implemented yet.\n";
+
+        std::basic_ifstream<uint8_t> inputFile(inputPath, std::ios_base::binary);
+        const auto base = inputFile.tellg();
+        std::size_t numProcessedPositions = 0;
+
+        std::basic_ofstream<uint8_t> outputFile(outputPath, om);
+        std::string buffer;
+        buffer.reserve(bufferSize * 2);
+
+        Position pos;
+        vector<uint8_t> data_in;
+        vector<uint8_t> data_out;
+
+        array<uint8_t,5> magic_ver = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
+        array<uint8_t,5> header{};
+
+        struct variant_info
+        {
+            uint8_t ranks;
+            uint8_t files;
+            uint16_t squares;
+            uint16_t piece_types;   
+        } vi;
+
+        if (!inputFile.read(header.data(), header.size()))
+        {
+            cout << "ERROR: couldn't open file.\n";
+            return;
+        }
+
+        if ( equal( header.begin(), header.end(), magic_ver.begin() ) )
+        {
+            cout << "Matched file magic and version.\n";
+        }
+        else
+        {
+            cerr << "ERROR: Didn't match file magic and version.\n";
+            return;
+        }
+
+        if (!inputFile.read(reinterpret_cast<uint8_t*>(&vi), sizeof(vi)))
+        {
+            cout << "ERROR: couldn't open file.\n";
+            return;
+        }
+
+        for (;;)
+        {
+            uint16_t size = 0;
+
+            if (!inputFile.read(reinterpret_cast<uint8_t*>(&size), sizeof(size)))
+            {
+                break;
+            }
+
+            if (!inputFile.read(buf.data(), size))
+            {
+                break;
+            }
+            else
+            {
+                const uint16_t POSITION_MAGIC = 0;
+                const uint16_t magic = (size & 0xC000) >> 14;
+
+                // Check magic bits match.
+                if (magic == POSITION_MAGIC)
+                {
+                    //std::cout << "Matched position magic.\n";
+                }
+                else
+                {
+                    std::cout << "ERROR: POSITON_MAGIC should be 0 but it was " << magic << "\n";
+                    break;
+                }
+
+                const int copy_size = size - 7;
+                const Square max_sq = SQ_MAX; // TODO: get this from the file header.
+                const int piece_type_count = 6; // TODO: get this from the file header.
+                PieceCode board[SQ_MAX];
+                PieceCode::calc_code_size(piece_type_count);
+
+                data_in.clear();
+                data_in.insert(data_in.end(), buf.begin() + 7, buf.begin() + size);
+
+                if (copy_size <= (DATA_SIZE / 8))
+                {
+                    convert(format_in, data_in, format_out, data_out);
+                }
+                else
+                {
+                    std::cout << "BIN2 position is too large to convert. " << copy_size << " > " << (DATA_SIZE / 8) << '\n';
+                }
+
+                //std::cout << "BIN size: " << data_out.size() << '\n' << "BEFORE pos: " << outputFile.tellp() << '\n';
+                outputFile.seekp(72*numProcessedPositions);
+                //outputFile.write(reinterpret_cast<const char*>(data_out.data()), data_out.size());
+                outputFile.write(data_out.data(), data_out.size());
+                //std::cout << "AFTER pos: " << outputFile.tellp() << '\n';
+
+                ++numProcessedPositions;
+            }
+        }
+
+        outputFile.flush();
+        outputFile.close();
+        inputFile.close();
+
+        std::cout << "Finished. Converted " << numProcessedPositions << " positions.\n";
     }
 
     using ConvertFunctionType = void(std::string inputPath, std::string outputPath, std::ios_base::openmode om, bool validate);
@@ -551,12 +1091,49 @@ namespace Stockfish::Tools
 
     static void convert(const std::string& input_path, const std::string& output_path, std::ios_base::openmode om, bool validate)
     {
-        if(!file_exists(input_path))
+        if (!file_exists(input_path))
         {
             std::cerr << "Input file does not exist.\n";
             return;
         }
 
+        PosCodec* format_in = PosCodec::get_codec(input_path);
+        PosCodec* format_out = PosCodec::get_codec(output_path);
+        bool can_convert = true;
+
+        // Each format has to be able to convert to/from a Position object, and input/output to their respective file format.
+        if (format_in == nullptr)
+        {
+            std::cerr << "No matching format found for file: " << input_path << ".\n";
+            can_convert = false;
+        }
+        else if (!format_in->is_decoder())
+        {
+            std::cerr << "Format " << format_in->name() << " cannot be used as an input format.\n";
+            can_convert = false;
+        }
+
+        if (format_out == nullptr)
+        {
+            std::cerr << "No matching format found for file: " << output_path << ".\n"; 
+            can_convert = false;
+        }
+        else if (!format_out->is_encoder())
+        {
+            std::cerr << "Format " << format_out->name() << " cannot be used as an output format.\n";
+            can_convert = false;
+        }
+
+        if ( can_convert )
+        {
+            convert(*format_in, *format_out, input_path, output_path, om, validate);
+        }
+        else
+        {
+            std::cerr << "Conversion between these file formats is not supported.\n";
+        }
+
+        /* TODO: replace this.
         auto func = get_convert_function(input_path, output_path);
         if (func != nullptr)
         {
@@ -566,6 +1143,7 @@ namespace Stockfish::Tools
         {
             std::cerr << "Conversion between files of these types is not supported.\n";
         }
+        //*/
     }
 
     static void convert(const std::vector<std::string>& args)

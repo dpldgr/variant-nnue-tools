@@ -90,7 +90,10 @@ namespace Stockfish::Tools {
     struct Bin2InputStream : BasicSfenInputStream
     {
         static constexpr auto openmode = std::ios::in | std::ios::binary;
-        static inline const std::string extension = "bin";
+        static inline const std::string extension = "bin2";
+        static constexpr std::array<uint8_t, 5> file_header = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
+        bool header_read = false;
+        bool header_match = false;
 
         Bin2InputStream(std::string filename) :
             m_stream(filename, openmode),
@@ -98,11 +101,21 @@ namespace Stockfish::Tools {
         {
         }
 
-        // TODO: update to read new bin2 format.
         std::optional<PackedSfenValue> next() override
         {
             PackedSfenValue e;
-            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(PackedSfenValue)))
+            uint16_t size;
+
+            if (!header_read)
+            {
+                std::array<uint8_t, 5> header_data;
+                m_stream.read(header_data.data(), header_data.size());
+                if ( std::equal(header_data.begin(), header_data.end(), file_header.begin()) )
+                    header_match = true;
+                header_read = true;
+            }
+
+            if (m_stream.read(reinterpret_cast<uint8_t*>(&size), sizeof(size)) && m_stream.read(reinterpret_cast<uint8_t*>(&e), size))
             {
                 return e;
             }
@@ -121,7 +134,7 @@ namespace Stockfish::Tools {
         ~Bin2InputStream() override {}
 
     private:
-        std::fstream m_stream;
+        std::basic_fstream<uint8_t> m_stream;
         bool m_eof;
     };
 
@@ -198,6 +211,8 @@ namespace Stockfish::Tools {
     {
         static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
         static inline const std::string extension = "bin2";
+        static constexpr std::array<uint8_t, 5> file_header = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
+        bool header_written = false;
 
         Bin2OutputStream(std::string filename) :
             m_stream(filename_with_extension(filename, extension), openmode)
@@ -206,9 +221,16 @@ namespace Stockfish::Tools {
 
         void write(const PSVector& sfens) override
         {
+            if (!header_written)
+            {
+                m_stream.write(file_header.data(), file_header.size());
+                header_written = true;
+            }
+
             for (auto& sfen : sfens)
             {
                 int i = (DATA_SIZE / 8) - 1;
+                //int i = (BIN2_DATA_SIZE / 8) - 1;
 
                 for (; i >= 0; i--)
                 {
@@ -216,17 +238,17 @@ namespace Stockfish::Tools {
                         break;
                 }
 
-                int write_size = 7 + i;
+                int write_size = (7 + i + 1) & 0x3FFF;
 
-                m_stream.write(reinterpret_cast<const char*>(&write_size), 1);
-                m_stream.write(reinterpret_cast<const char*>(&sfen), write_size);
+                m_stream.write(reinterpret_cast<uint8_t*>(&write_size), 2);
+                m_stream.write(reinterpret_cast<const uint8_t*>(&sfen), write_size);
             }
         }
 
         ~Bin2OutputStream() override {}
 
     private:
-        std::fstream m_stream;
+        std::basic_fstream<uint8_t> m_stream;
     };
 
     struct BinpackSfenOutputStream : BasicSfenOutputStream

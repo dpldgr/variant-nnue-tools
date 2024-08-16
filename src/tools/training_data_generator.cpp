@@ -362,7 +362,7 @@ namespace Stockfish::Tools
 
                     // Here we only write the position data.
                     // Result is added after the whole game is done.
-                    pos.sfen_pack(psv.sfen);
+                    psv.sfen = Tools::sfen_pack(pos, params.sfen_format);
 
                     psv.score = search_value;
                     psv.move = search_pv[0];

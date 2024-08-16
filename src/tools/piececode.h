@@ -214,6 +214,18 @@ namespace Stockfish::Tools
             return (_is_piece == false);
         }
 
+        inline void build_piece(bool v)
+        {
+            _is_piece = v;
+        }
+
+        inline void build_piece(int v)
+        {
+            if (v == 0x00 || v == (1 << (_bits - 1)))
+                _is_king = true;
+            _code = v;
+        }
+
         inline bool is_piece() const
         {
             return (_is_piece == true);

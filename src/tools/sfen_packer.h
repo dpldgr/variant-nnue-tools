@@ -4,6 +4,7 @@
 #include "types.h"
 
 #include "packed_sfen.h"
+#include "sfen_stream.h"
 
 #include <cstdint>
 
@@ -16,7 +17,7 @@ namespace Stockfish {
 namespace Stockfish::Tools {
 
     int set_from_packed_sfen(Position& pos, const PackedSfen& sfen, StateInfo* si, Thread* th);
-    PackedSfen sfen_pack(Position& pos);
+    PackedPos sfen_pack(Position& pos, SfenOutputType sfen_format);
 }
 
 #endif

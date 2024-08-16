@@ -1,7 +1,9 @@
 ﻿#include "sfen_packer.h"
 
 #include "packed_sfen.h"
+#include "bitstream.h"
 #include "piececode.h"
+#include "sfen_stream.h"
 
 #include "misc.h"
 #include "position.h"
@@ -10,6 +12,7 @@
 
 #include <sstream>
 #include <fstream>
+#include <iomanip>
 #include <cstring> // std::memset()
 
 using namespace std;
@@ -18,68 +21,9 @@ namespace Stockfish::Tools {
 
     int PieceCode::code_size = PIECE_TYPE_BITS + 1;
 
-    // Class that handles bitstream
-    // useful when doing aspect encoding
-    struct BitStream
-    {
-        // Set the memory to store the data in advance.
-        // Assume that memory is cleared to 0.
-        void set_data(std::uint8_t* data_) { data = data_; reset(); }
+    struct PosPacker {};
 
-        // Get the pointer passed in set_data().
-        uint8_t* get_data() const { return data; }
-
-        // Get the cursor.
-        int get_cursor() const { return bit_cursor; }
-
-        // reset the cursor
-        void reset() { bit_cursor = 0; }
-
-        // Write 1bit to the stream.
-        // If b is non-zero, write out 1. If 0, write 0.
-        void write_one_bit(int b)
-        {
-            if (b)
-                data[bit_cursor / 8] |= 1 << (bit_cursor & 7);
-
-            ++bit_cursor;
-        }
-
-        // Get 1 bit from the stream.
-        int read_one_bit()
-        {
-            int b = (data[bit_cursor / 8] >> (bit_cursor & 7)) & 1;
-            ++bit_cursor;
-
-            return b;
-        }
-
-        // write n bits of data
-        // Data shall be written out from the lower order of d.
-        void write_n_bit(int d, int n)
-        {
-            for (int i = 0; i <n; ++i)
-                write_one_bit(d & (1 << i));
-        }
-
-        // read n bits of data
-        // Reverse conversion of write_n_bit().
-        int read_n_bit(int n)
-        {
-            int result = 0;
-            for (int i = 0; i < n; ++i)
-                result |= read_one_bit() ? (1 << i) : 0;
-
-            return result;
-        }
-
-    private:
-        // Next bit position to read/write.
-        int bit_cursor;
-
-        // data entity
-        std::uint8_t* data;
-    };
+    struct Bin2Packer : public PosPacker {};
 
     // Class for compressing/decompressing sfen
     // sfen can be packed to 256bit (32bytes) by Huffman coding.
@@ -97,7 +41,7 @@ namespace Stockfish::Tools {
     //
     // TODO(someone): Rename SFEN to FEN.
     //
-    struct SfenPacker
+    struct SfenPacker : public PosPacker
     {
         void pack(const Position& pos);
 
@@ -113,8 +57,10 @@ namespace Stockfish::Tools {
         // Read one board piece from stream
         Piece read_board_piece_from_stream(const Position& pos);
 
-        // PieceCode related functions.
+        // Bin2 related.
+        uint8_t* data_v2;
         void pack_v2(const Position& pos);
+        void unpack_v2(const Position& pos);
         PieceCode read_piece_code_from_stream(const Position& pos);
     };
 
@@ -169,6 +115,7 @@ namespace Stockfish::Tools {
         {0b11111,5}, //
     };
 
+    /* Moved to class Position,
     inline Square to_variant_square(Square s, const Position& pos) {
         return Square(s - rank_of(s) * (FILE_MAX - pos.max_file()));
     }
@@ -176,6 +123,7 @@ namespace Stockfish::Tools {
     inline Square from_variant_square(Square s, const Position& pos) {
         return Square(s + s / pos.files() * (FILE_MAX - pos.max_file()));
     }
+    //*/
 
     // Pack sfen and store in data[64].
     void SfenPacker::pack(const Position& pos)
@@ -190,7 +138,7 @@ namespace Stockfish::Tools {
         // 7-bit positions for leading and trailing balls
         // White king and black king, 6 bits for each.
         for(auto c: Colors)
-            stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
+            stream.write_n_bit(pos.nnue_king() ? pos.to_variant_square(pos.king_square(c)) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
 
         // Write the pieces on the board other than the kings.
         for (Rank r = pos.max_rank(); r >= RANK_1; --r)
@@ -220,7 +168,7 @@ namespace Stockfish::Tools {
         else {
             stream.write_one_bit(1);
             // Additional ep squares (e.g., for berolina) are not encoded
-            stream.write_n_bit(static_cast<int>(to_variant_square(lsb(pos.ep_squares()), pos)), 7);
+            stream.write_n_bit(static_cast<int>(pos.to_variant_square(lsb(pos.ep_squares()))), 7);
         }
 
         stream.write_n_bit(pos.state()->rule50, 6);
@@ -292,11 +240,12 @@ namespace Stockfish::Tools {
 
     void SfenPacker::pack_v2(const Position& pos)
     {
-        const Square max_sq = to_variant_square(pos.max_square(),pos);
+        const Square max_sq = pos.to_variant_square(pos.max_square());
         PieceCode::calc_code_size(pos.piece_types_count());
 
-        memset(data, 0, DATA_SIZE / 8 /* 512bit */);
-        stream.set_data(data);
+        memset(data_v2, 0, DATA_SIZE / 8 /* 512 bits */);
+        //memset(data_v2, 0, BIN2_DATA_SIZE / 8 /* 2048 bits */);
+        stream.set_data(data_v2);
 
         // Encodes both side to move and game ply.
         const int ply_count = pos.ply_from_start();
@@ -309,35 +258,62 @@ namespace Stockfish::Tools {
             stream.write_n_bit(pos.nnue_king() ? to_variant_square(pos.king_square(c), pos) : (pos.max_file() + 1) * (pos.max_rank() + 1), 7);
         //*/
 
+        //cout << "\npc:[";
+
+        for (Square i = SQ_A1; i <= max_sq; ++i)
+        {
+            Square sq = pos.from_variant_square(i);
+            Piece pc = pos.piece_on(sq);
+            //cout << setfill('0') << setw(2) << std::hex << pc;
+            //if (i < max_sq) cout << ",";
+        }
+
+        //cout << "]\nocc:";
+
         // Write board occupancy.
         for (Square i = SQ_A1; i <= max_sq; ++i)
         {
-            Square sq = from_variant_square(i, pos);
+            Square sq = pos.from_variant_square(i);
             Piece pc = pos.piece_on(sq);
             stream.write_one_bit( pc == NO_PIECE ? 0 : 1);
+            //cout << (pc == NO_PIECE ? "0" : "1");
         }
+
+        //cout << "\ncodes:[";
 
         // Write piece codes.
         for (Square i = SQ_A1; i <= max_sq; ++i)
         {
-            Square sq = from_variant_square(i, pos);
+            Square sq = pos.from_variant_square(i);
             Piece pc = pos.piece_on(sq);
             PieceCode pcc = pc;
 
             if (pcc.is_piece())
             {
                 stream.write_n_bit(pcc.code(), pcc.bits());
+                //cout << setfill('0') << setw(2) << std::hex << pcc.code();
+                //if ( i < max_sq ) cout << ",";
             }
         }
+
+        //cout << "]\n";
 
         // Write out pieces in hand only if drops are enabled?
         if (pos.variant()->freeDrops == true)
         {
             for (auto c : Colors)
                 for (PieceSet ps = pos.piece_types(); ps;)
-                    stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), DATA_SIZE > 512 ? 7 : 5);
+                    stream.write_n_bit(pos.count_in_hand(c, pop_lsb(ps)), 7 );
         }
 
+
+        int n_move_count = pos.rule50_count();
+
+        //cout <<  std::dec << "ply:" << ply_count << "\nn_move:" << n_move_count << "\n";
+
+        stream.write_n_bit(n_move_count, 8);
+
+        /* FIXME: not using these for now. 
         stream.write_one_bit(pos.can_castle(WHITE_OO));
         stream.write_one_bit(pos.can_castle(WHITE_OOO));
         stream.write_one_bit(pos.can_castle(BLACK_OO));
@@ -349,12 +325,17 @@ namespace Stockfish::Tools {
         else {
             stream.write_one_bit(1);
             // Additional ep squares (e.g., for berolina) are not encoded
-            stream.write_n_bit(static_cast<int>(to_variant_square(lsb(pos.ep_squares()), pos)), 7);
+            stream.write_n_bit(static_cast<int>(pos.to_variant_square(lsb(pos.ep_squares()))), 7);
         }
-
-        stream.write_n_bit(pos.rule50_count(), 8);
+        //*/
 
         assert(stream.get_cursor() <= DATA_SIZE);
+        //assert(stream.get_cursor() <= BIN2_DATA_SIZE);
+    }
+
+    void SfenPacker::unpack_v2(const Position& pos)
+    {
+
     }
 
     PieceCode SfenPacker::read_piece_code_from_stream(const Position& pos)
@@ -383,7 +364,7 @@ namespace Stockfish::Tools {
 
         // First the position of the ball
         for (auto c : Colors)
-            pos.board[from_variant_square(Square(stream.read_n_bit(7)), pos)] = make_piece(c, pos.nnue_king());
+            pos.board[pos.from_variant_square(Square(stream.read_n_bit(7)))] = make_piece(c, pos.nnue_king());
 
         // Piece placement
         for (Rank r = pos.max_rank(); r >= RANK_1; --r)
@@ -481,14 +462,43 @@ namespace Stockfish::Tools {
         return 0;
     }
 
-    PackedSfen sfen_pack(Position& pos)
+    inline std::unique_ptr<PosPacker> create_new_pos_packer(SfenOutputType sfen_output_type)
     {
-        PackedSfen sfen;
+        switch (sfen_output_type)
+        {
+        case SfenOutputType::Bin:
+            return std::make_unique<SfenPacker>();
+        case SfenOutputType::Bin2:
+            return std::make_unique<Bin2Packer>();
+        }
+
+        assert(false);
+        return nullptr;
+    }
+
+    PackedPos sfen_pack(Position& pos, SfenOutputType sfen_format)
+    {
+        PackedPos ret;
+        PackedSfen bin_pos;
+        Bin2PackedPos bin2_pos;
 
         SfenPacker sp;
-        sp.data = (uint8_t*)&sfen;
-        sp.pack_v2(pos);
+        sp.data = bin_pos.data;
+        sp.data_v2 = bin2_pos.data;
 
-        return sfen;
+        if (sfen_format == SfenOutputType::Bin)
+        {
+            sp.pack(pos);
+            ret.data = bin_pos.data;
+            ret.size = sizeof(bin_pos);
+        }
+        else if (sfen_format == SfenOutputType::Bin2)
+        {
+            sp.pack_v2(pos);
+            ret.data = bin2_pos.data;
+            ret.size = sp.stream.get_cursor() / 8;
+        }
+
+        return ret;
     }
 }
