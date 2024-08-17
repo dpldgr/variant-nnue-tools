@@ -62,7 +62,7 @@ namespace Stockfish::Tools {
 #endif
         }
 
-        void write(size_t thread_id, const PackedSfenValue& psv)
+        void write(size_t thread_id, const PackedPos& psv)
         {
             // We have a buffer for each thread and add it there.
             // If the buffer overflows, write it to a file.

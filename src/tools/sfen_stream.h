@@ -45,7 +45,7 @@ namespace Stockfish::Tools {
 
     struct BasicSfenInputStream
     {
-        virtual std::optional<PackedSfenValue> next() = 0;
+        virtual std::optional<PackedPosValue> next() = 0;
         virtual bool eof() const = 0;
         virtual ~BasicSfenInputStream() {}
     };
@@ -61,10 +61,10 @@ namespace Stockfish::Tools {
         {
         }
 
-        std::optional<PackedSfenValue> next() override
+        std::optional<PackedPosValue> next() override
         {
-            PackedSfenValue e;
-            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(PackedSfenValue)))
+            BinPackedPosValue e;
+            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(BinPackedPosValue)))
             {
                 return e;
             }
@@ -101,9 +101,9 @@ namespace Stockfish::Tools {
         {
         }
 
-        std::optional<PackedSfenValue> next() override
+        std::optional<PackedPosValue> next() override
         {
-            PackedSfenValue e;
+            Bin2PackedPosValue e;
             uint16_t size;
 
             if (!header_read)
@@ -149,9 +149,9 @@ namespace Stockfish::Tools {
         {
         }
 
-        std::optional<PackedSfenValue> next() override
+        std::optional<PackedPosValue> next() override
         {
-            static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(PackedSfenValue));
+            //static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(BinPackedPosValue)); // FIXME.
 
             if (!m_stream.hasNext())
             {
@@ -161,9 +161,9 @@ namespace Stockfish::Tools {
 
             auto training_data_entry = m_stream.next();
             auto v = binpack::trainingDataEntryToPackedSfenValue(training_data_entry);
-            PackedSfenValue psv;
+            BinPackedPosValue psv;
             // same layout, different types. One is from generic library.
-            std::memcpy(&psv, &v, sizeof(PackedSfenValue));
+            std::memcpy(&psv, &v, sizeof(BinPackedPosValue));
 
             return psv;
         }
@@ -198,7 +198,7 @@ namespace Stockfish::Tools {
 
         void write(const PSVector& sfens) override
         {
-            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(PackedSfenValue) * sfens.size());
+            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(BinPackedPosValue) * sfens.size());
         }
 
         ~BinSfenOutputStream() override {}
@@ -234,7 +234,7 @@ namespace Stockfish::Tools {
 
                 for (; i >= 0; i--)
                 {
-                    if (sfen.sfen.data[i] != 0)
+                    if (sfen.v->sfen.data[i] != 0)
                         break;
                 }
 
@@ -263,7 +263,7 @@ namespace Stockfish::Tools {
 
         void write(const PSVector& sfens) override
         {
-            static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(PackedSfenValue));
+            //static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(BinPackedPosValue // FIXME.
 
             for(auto& sfen : sfens)
             {

@@ -77,14 +77,14 @@ namespace Stockfish::Tools{
         }
 
         // Load the phase for calculation such as mse.
-        PSVector read_some(uint64_t count, uint64_t count_tries, std::function<bool(const PackedSfenValue&)> do_take)
+        PSVector read_some(uint64_t count, uint64_t count_tries, std::function<bool(const BinPackedPosValue&)> do_take)
         {
             PSVector psv;
             psv.reserve(count);
 
             for (uint64_t i = 0; i < count_tries; ++i)
             {
-                PackedSfenValue ps;
+                BinPackedPosValue ps;
                 if (!read_to_thread_buffer(0, ps))
                 {
                     std::cout << "ERROR (sfen_reader): Reading failed." << std::endl;
@@ -104,7 +104,7 @@ namespace Stockfish::Tools{
         }
 
         // [ASYNC] Thread returns one aspect. Otherwise returns false.
-        bool read_to_thread_buffer(size_t thread_id, PackedSfenValue& ps)
+        bool read_to_thread_buffer(size_t thread_id, BinPackedPosValue& ps)
         {
             // If there are any positions left in the thread buffer
             // then retrieve one and return it.
@@ -238,7 +238,7 @@ namespace Stockfish::Tools{
                 // Read from the file into the file buffer.
                 while (sfens.size() < sfen_read_size)
                 {
-                    std::optional<PackedSfenValue> p = sfen_input_stream->next();
+                    std::optional<BinPackedPosValue> p = sfen_input_stream->next();
                     if (p.has_value())
                     {
                         sfens.push_back(*p);
@@ -284,7 +284,7 @@ namespace Stockfish::Tools{
                     memcpy(
                         buf->data(),
                         &sfens[offset],
-                        sizeof(PackedSfenValue) * count);
+                        sizeof(BinPackedPosValue) * count);
 
                     buffers.emplace_back(std::move(buf));
                 }

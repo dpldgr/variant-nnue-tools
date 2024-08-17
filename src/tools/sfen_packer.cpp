@@ -343,7 +343,7 @@ namespace Stockfish::Tools {
         return PieceCode(stream.read_n_bit(PieceCode::code_size));
     }
 
-    int set_from_packed_sfen(Position& pos, const PackedSfen& sfen, StateInfo* si, Thread* th)
+    int set_from_packed_sfen(Position& pos, const BinPackedPosBuffer& sfen, StateInfo* si, Thread* th)
     {
         SfenPacker packer;
         auto& stream = packer.stream;
@@ -476,27 +476,28 @@ namespace Stockfish::Tools {
         return nullptr;
     }
 
-    PackedPos sfen_pack(Position& pos, SfenOutputType sfen_format)
+    PackedPos sfen_pack(Position& pos)
     {
+        SfenOutputType sfen_format = SfenOutputType::Bin;
         PackedPos ret;
-        PackedSfen bin_pos;
-        Bin2PackedPos bin2_pos;
+        BinPackedPosBuffer bin_buf;
+        Bin2PackedPosBuffer bin2_buf;
 
         SfenPacker sp;
-        sp.data = bin_pos.data;
-        sp.data_v2 = bin2_pos.data;
+        sp.data = bin_buf.data;
+        sp.data_v2 = bin2_buf.data;
 
         if (sfen_format == SfenOutputType::Bin)
         {
             sp.pack(pos);
-            ret.data = bin_pos.data;
-            ret.size = sizeof(bin_pos);
+            ret.v->sfen = bin_buf;
+            ret.data_size = sizeof(bin_buf);
         }
         else if (sfen_format == SfenOutputType::Bin2)
         {
             sp.pack_v2(pos);
-            ret.data = bin2_pos.data;
-            ret.size = sp.stream.get_cursor() / 8;
+            //ret.v->sfen = bin2_buf; // FIXME.
+            ret.data_size = ceil(sp.stream.get_cursor() / 8.0);
         }
 
         return ret;

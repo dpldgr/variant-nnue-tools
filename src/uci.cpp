@@ -397,9 +397,11 @@ void UCI::loop(int argc, char* argv[]) {
   else if (argc == 1 || !(std::strcmp(argv[1], "load") == 0))
   {
       // Check environment for variants.ini file
+      /* FIXME
       char *envVariantPath = std::getenv("FAIRY_STOCKFISH_VARIANT_PATH");
       if (envVariantPath != NULL)
           Options["VariantPath"] = std::string(envVariantPath);
+      //*/
   }
 
   do {

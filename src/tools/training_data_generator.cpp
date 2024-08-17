@@ -362,11 +362,13 @@ namespace Stockfish::Tools
 
                     // Here we only write the position data.
                     // Result is added after the whole game is done.
-                    psv.sfen = Tools::sfen_pack(pos, params.sfen_format);
+                    psv = Tools::sfen_pack(pos);
+                    //psv = Tools::sfen_pack(pos, params.sfen_format); // FIXME.
+                    //psv.pack(pos, params.sfen_format); // FIXME.
 
-                    psv.score = search_value;
-                    psv.move = search_pv[0];
-                    psv.gamePly = ply;
+                    psv.v->score = search_value;
+                    psv.v->move = search_pv[0];
+                    psv.v->gamePly = ply;
                 }
 
                 // Update the next move according to best search result or random move.
@@ -657,17 +659,14 @@ namespace Stockfish::Tools
             return false;
         }
 
-        auto side_to_move_from_sfen = [](auto& sfen){
-            return (Color)(sfen.sfen.data[0] & 1);
-        };
-
         // From the final stage (one step before) to the first stage, give information on the outcome of the game for each stage.
         // The phases stored in sfens are assumed to be continuous (in order).
         for (auto it = sfens.rbegin(); it != sfens.rend(); ++it)
         {
             // The side to move is packed as the lowest bit of the first byte
-            const Color side_to_move = side_to_move_from_sfen(*it);
-            it->game_result = side_to_move == result_color ? result : -result;
+            // const Color side_to_move = side_to_move_from_sfen(*it);
+            // it->game_result = side_to_move == result_color ? result : -result;
+            it->set_result(result);
         }
 
         // Write sfens in move order to make potential compression easier

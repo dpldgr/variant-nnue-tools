@@ -6,29 +6,21 @@
 
 namespace Stockfish::Tools {
 
-    // packed sfen
-    typedef std::array<uint8_t, DATA_SIZE/8+8> BinPosPacked;
-    typedef std::array<uint8_t, BIN2_DATA_SIZE/8> Bin2PosPacked;
+    struct BinPackedPosBuffer { std::uint8_t data[DATA_SIZE / 8]; };
+    struct Bin2PackedPosBuffer { std::uint8_t data[BIN2_DATA_SIZE / 8]; };
 
-    struct PackedPos
+    struct PackedPosValue
     {
-        uint8_t* data;
-        uint32_t size;
+        virtual ~PackedPosValue() {}; // FIXME: does this change the number of bytes written to file?
     };
 
-    struct PackedSfen { std::uint8_t data[DATA_SIZE / 8]; };
-    struct Bin2PackedPos { std::uint8_t data[BIN2_DATA_SIZE / 8]; };
-
-    struct BasePosValue {};
-
-    // Structure in which PackedSfen and evaluation value are integrated
+    // Structure in which BinPackedPosBuffer and evaluation value are integrated
     // If you write different contents for each option, it will be a problem when reusing the teacher game
     // For the time being, write all the following members regardless of the options.
-    struct PackedSfenValue : BasePosValue
+    struct BinPackedPosValue : PackedPosValue
     {
         // phase
-        std::uint8_t sfen[DATA_SIZE / 8]{};
-        //PackedSfen sfen;
+        BinPackedPosBuffer sfen;
 
         // Evaluation value returned from Tools::search()
         std::int16_t score;
@@ -52,7 +44,7 @@ namespace Stockfish::Tools {
         // 64 + 2 + 2 + 2 + 1 + 1 = 72bytes
     };
 
-    struct Bin2PackedPosValue : BasePosValue
+    struct Bin2PackedPosValue : PackedPosValue
     {
         // Evaluation value returned from Tools::search()
         std::int16_t score;
@@ -71,12 +63,39 @@ namespace Stockfish::Tools {
         std::int8_t game_result;
 
         // phase
-        //PackedSfen sfen;
-        std::uint8_t sfen[BIN2_DATA_SIZE / 8]{};
+        Bin2PackedPosBuffer sfen;
+    };
+
+    class PackedPos
+    {
+    public:
+        BinPackedPosValue* v;
+        int data_size = 0;
+
+        PackedPos()
+        {
+            v = new BinPackedPosValue();
+        }
+
+        PackedPos( const PackedPos& pp )
+        {
+            v = pp.v;
+            data_size = pp.data_size;
+        }
+
+        ~PackedPos()
+        {
+            if (v)
+                delete v;
+        }
+
+        void set_result(uint8_t r)
+        {
+            v->game_result = r;
+        }
     };
 
     // Phase array: PSVector stands for packed sfen vector.
-    using PSVector = std::vector<PackedSfenValue>;
-    using PPVector = std::vector<Bin2PackedPosValue>;
+    using PSVector = std::vector<PackedPos>;
 }
 #endif

@@ -141,6 +141,7 @@ namespace Stockfish::Tools
         buffer.reserve(batch_size);
 
         uint64_t num_processed = 0;
+        /* FIXME
         for (;;)
         {
             auto v = in->next();
@@ -154,7 +155,7 @@ namespace Stockfish::Tools
             auto deep_eval = ps.score;
             ps.score = nudge(params, static_eval, deep_eval);
 
-            buffer.emplace_back(ps);
+            buffer.emplace_back(ps); // FIXME: this line causes a compiler error in xmemory.
             if (buffer.size() >= batch_size)
             {
                 num_processed += buffer.size();
@@ -165,6 +166,7 @@ namespace Stockfish::Tools
                 std::cout << "Processed " << num_processed << " positions.\n";
             }
         }
+        //*/
 
         if (!buffer.empty())
         {
@@ -246,6 +248,7 @@ namespace Stockfish::Tools
     {
         std::ifstream fens_file(params.input_filename);
 
+        /* FIXME.
         auto next_fen = [&fens_file, mutex = std::mutex{}]() mutable -> std::optional<std::string>{
             std::string fen;
 
@@ -260,6 +263,7 @@ namespace Stockfish::Tools
                 return std::nullopt;
             }
         };
+        //*/
 
         PSVector buffer;
         uint64_t batch_size = 10'000;
@@ -287,6 +291,7 @@ namespace Stockfish::Tools
         // depth is also processed by the one passed as an argument of Tools::search().
         limits.depth = 0;
 
+        /* FIXME.
         Threads.execute_with_workers([&](auto& th){
             Position& pos = th.rootPos;
             StateInfo si;
@@ -309,7 +314,7 @@ namespace Stockfish::Tools
                 if (search_pv.empty())
                     continue;
 
-                PackedSfenValue ps;
+                BinPackedPosValue ps;
                 pos.sfen_pack(ps.sfen);
                 ps.score = search_value;
                 ps.move = search_pv[0];
@@ -330,6 +335,7 @@ namespace Stockfish::Tools
                 }
             }
         });
+        //*/
         Threads.wait_for_workers_finished();
 
         if (!buffer.empty())
@@ -349,6 +355,8 @@ namespace Stockfish::Tools
     {
         // TODO: Use SfenReader once it works correctly in sequential mode. See issue #271
         auto in = Tools::open_sfen_input_file(params.input_filename);
+
+        /* FIXME.
         auto readsome = [&in, mutex = std::mutex{}](int n) mutable -> PSVector {
 
             PSVector psv;
@@ -371,6 +379,7 @@ namespace Stockfish::Tools
 
             return psv;
         };
+        //*/
 
         auto sfen_format = ends_with(params.output_filename, ".binpack") ? SfenOutputType::Binpack : SfenOutputType::Bin;
 
@@ -398,6 +407,7 @@ namespace Stockfish::Tools
 
         std::atomic<std::uint64_t> num_processed = 0;
 
+        /* FIXME. 
         Threads.execute_with_workers([&](auto& th){
             Position& pos = th.rootPos;
             StateInfo si;
@@ -410,7 +420,7 @@ namespace Stockfish::Tools
 
                 for(auto& ps : psv)
                 {
-                    pos.set_from_packed_sfen(ps.sfen, &si, &th);
+                    pos.set_from_packed_sfen(ps.v->sfen, &si, &th);
 
                     for (int cnt = 0; cnt < params.research_count; ++cnt)
                         Search::search(pos, params.depth, 1);
@@ -420,13 +430,13 @@ namespace Stockfish::Tools
                     if (search_pv.empty())
                         continue;
 
-                    pos.sfen_pack(ps.sfen);
-                    ps.score = search_value;
+                    pos.sfen_pack(ps.v->sfen);
+                    ps.v->score = search_value;
                     if (!params.keep_moves)
-                        ps.move = search_pv[0];
-                    ps.padding = 0;
+                        ps.v->move = search_pv[0];
+                    ps.v->padding = 0;
 
-                    out.write(th.id(), ps);
+                    out.write(th.id(), *ps.v);
 
                     auto p = num_processed.fetch_add(1) + 1;
                     if (p % 10000 == 0)
@@ -436,6 +446,7 @@ namespace Stockfish::Tools
                 }
             }
         });
+        //*/
         Threads.wait_for_workers_finished();
 
         std::cout << "Finished.\n";

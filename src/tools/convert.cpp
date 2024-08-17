@@ -83,7 +83,7 @@ namespace Stockfish::Tools
             std::string line;
             ifstream ifs;
             ifs.open(filename);
-            PackedSfenValue p;
+            BinPackedPosValue p;
             data_size = 0;
             filtered_size = 0;
             filtered_size_fen = 0;
@@ -154,7 +154,7 @@ namespace Stockfish::Tools
                 }
                 else if (token == "e") {
                     if (!(ignore_flag_fen || ignore_flag_move || ignore_flag_ply)) {
-                        fs.write((char*)&p, sizeof(PackedSfenValue));
+                        fs.write((char*)&p, sizeof(BinPackedPosValue));
                         data_size += 1;
                         // debug
                         // std::cout<<tpos<<std::endl;
@@ -319,8 +319,8 @@ namespace Stockfish::Tools
                     while (true) {
                         gamePly++;
 
-                        PackedSfenValue psv;
-                        memset((char*)&psv, 0, sizeof(PackedSfenValue));
+                        BinPackedPosValue psv;
+                        memset((char*)&psv, 0, sizeof(BinPackedPosValue));
 
                         // fen
                         {
@@ -448,7 +448,7 @@ namespace Stockfish::Tools
                                 psv.game_result *= -1;
                             }
 
-                            ofs.write((char*)&psv, sizeof(PackedSfenValue));
+                            ofs.write((char*)&psv, sizeof(BinPackedPosValue));
 
                             fen_count++;
                         }
@@ -478,12 +478,12 @@ namespace Stockfish::Tools
             // Just convert packedsfenvalue to text
             std::fstream fs;
             fs.open(filename, ios::in | ios::binary);
-            PackedSfenValue p;
+            BinPackedPosValue p;
             while (true)
             {
-                if (fs.read((char*)&p, sizeof(PackedSfenValue))) {
+                if (fs.read((char*)&p, sizeof(BinPackedPosValue))) {
                     StateInfo si;
-                    tpos.set_from_packed_sfen(p.sfen, &si, th);
+                    Tools::set_from_packed_sfen(tpos, p.sfen, &si, th);
 
                     // write as plain text
                     ofs << "fen " << tpos.fen() << std::endl;
@@ -515,13 +515,6 @@ namespace Stockfish::Tools
         return f.good();
     }
 
-    static bool ends_with(const std::string& lhs, const std::string& end)
-    {
-        if (end.size() > lhs.size()) return false;
-
-        return std::equal(end.rbegin(), end.rend(), lhs.rbegin());
-    }
-
     static bool is_convert_of_type(
         const std::string& input_path,
         const std::string& output_path,
@@ -535,40 +528,6 @@ namespace Stockfish::Tools
     class PosCodec
     {
     public:
-        static PosCodec* get_codec(const std::string& path)
-        {
-            if (ends_with(path, plain_extension))
-                return new PlainCodec();
-            else if (ends_with(path, bin_extension))
-                return new BinCodec();
-            else if (ends_with(path, bin2_extension))
-                return new Bin2Codec();
-            else
-                return nullptr;
-        }
-
-        static PosCodec* get_codec_ext(const std::string& ext)
-        {
-            if (ext == plain_extension)
-                return new PlainCodec();
-            else if (ext == bin_extension)
-                return new BinCodec();
-            else if (ext == bin2_extension)
-                return new Bin2Codec();
-            else
-                return nullptr;
-        }
-
-        static PosCodec* get_codec_type(const SfenOutputType type)
-        {
-            if (type == SfenOutputType::Bin)
-                return new BinCodec();
-            else if (type == SfenOutputType::Bin2)
-                return new Bin2Codec();
-            else
-                return nullptr;
-        }
-
         virtual bool is_decoder() { return false; };
         virtual bool is_encoder() { return false; };
 
@@ -717,7 +676,7 @@ namespace Stockfish::Tools
             const Square max_sq = (Square)63;
             PieceCode board[max_sq+1];
             //Piece board_pc[max_sq+1];
-            CodecHelper hlp(&pos, &si, v);
+            PosCodecHelper hlp(&pos, &si, v);
 
             stream.set_data(data);
             const int ply_count = stream.read_n_bit(16);
@@ -938,6 +897,40 @@ namespace Stockfish::Tools
         }
     };
 
+    static PosCodec* get_codec(const std::string& path)
+    {
+        if (ends_with(path, plain_extension))
+            return new PlainCodec();
+        else if (ends_with(path, bin_extension))
+            return new BinCodec();
+        else if (ends_with(path, bin2_extension))
+            return new Bin2Codec();
+        else
+            return nullptr;
+    }
+
+    static PosCodec* get_codec_ext(const std::string& ext)
+    {
+        if (ext == plain_extension)
+            return new PlainCodec();
+        else if (ext == bin_extension)
+            return new BinCodec();
+        else if (ext == bin2_extension)
+            return new Bin2Codec();
+        else
+            return nullptr;
+    }
+
+    static PosCodec* get_codec_type(const SfenOutputType type)
+    {
+        if (type == SfenOutputType::Bin)
+            return new BinCodec();
+        else if (type == SfenOutputType::Bin2)
+            return new Bin2Codec();
+        else
+            return nullptr;
+    }
+
     inline void convert(PosCodec& format1, vector<uint8_t>& data1, PosCodec& format2, vector<uint8_t>& data2)
     {
         Position pos;
@@ -1097,8 +1090,8 @@ namespace Stockfish::Tools
             return;
         }
 
-        PosCodec* format_in = PosCodec::get_codec(input_path);
-        PosCodec* format_out = PosCodec::get_codec(output_path);
+        PosCodec* format_in = get_codec(input_path);
+        PosCodec* format_out = get_codec(output_path);
         bool can_convert = true;
 
         // Each format has to be able to convert to/from a Position object, and input/output to their respective file format.

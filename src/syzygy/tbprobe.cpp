@@ -48,7 +48,7 @@
 #  define NOMINMAX // Disable macros min() and max()
 #endif
 #include <windows.h>
-#endif
+    #endif
 
 using namespace Stockfish::Tablebases;
 
@@ -260,8 +260,10 @@ public:
             exit(EXIT_FAILURE);
         }
 
+        /* FIXME.
         *mapping = (uint64_t)mmap;
         *baseAddress = MapViewOfFile(mmap, FILE_MAP_READ, 0, 0, 0);
+        //*/
 
         if (!*baseAddress)
         {
@@ -290,8 +292,10 @@ public:
 #ifndef _WIN32
         munmap(baseAddress, mapping);
 #else
+        /* FIXME 
         UnmapViewOfFile(baseAddress);
         CloseHandle((HANDLE)mapping);
+        //*/
 #endif
     }
 };
@@ -468,7 +472,7 @@ public:
     void add(const std::vector<PieceType>& pieces);
 };
 
-TBTables TBTables;
+TBTables _TBTables;
 
 // If the corresponding file exists two new objects TBTable<WDL> and TBTable<DTZ>
 // are created and added to the lists and hash table. Called at init time.
@@ -1176,7 +1180,7 @@ Ret probe_table(const Position& pos, ProbeState* result, WDLScore wdl = WDLDraw)
     if (pos.count<ALL_PIECES>() == 2) // KvK
         return Ret(WDLDraw);
 
-    TBTable<Type>* entry = TBTables.get<Type>(pos.material_key());
+    TBTable<Type>* entry = _TBTables.get<Type>(pos.material_key());
 
     if (!entry || !mapped(*entry, pos))
         return *result = FAIL, Ret();
@@ -1267,7 +1271,7 @@ WDLScore search(Position& pos, ProbeState* result) {
 /// safe, nor it needs to be.
 void Tablebases::init(const std::string& paths) {
 
-    TBTables.clear();
+    _TBTables.clear();
     MaxCardinality = 0;
     TBFile::Paths = paths;
 
@@ -1375,43 +1379,43 @@ void Tablebases::init(const std::string& paths) {
 
     // Add entries in TB tables if the corresponding ".rtbw" file exists
     for (PieceType p1 = PAWN; p1 <= QUEEN; ++p1) {
-        TBTables.add({KING, p1, KING});
+        _TBTables.add({KING, p1, KING});
 
         for (PieceType p2 = PAWN; p2 <= p1; ++p2) {
-            TBTables.add({KING, p1, p2, KING});
-            TBTables.add({KING, p1, KING, p2});
+            _TBTables.add({KING, p1, p2, KING});
+            _TBTables.add({KING, p1, KING, p2});
 
             for (PieceType p3 = PAWN; p3 <= QUEEN; ++p3)
-                TBTables.add({KING, p1, p2, KING, p3});
+                _TBTables.add({KING, p1, p2, KING, p3});
 
             for (PieceType p3 = PAWN; p3 <= p2; ++p3) {
-                TBTables.add({KING, p1, p2, p3, KING});
+                _TBTables.add({KING, p1, p2, p3, KING});
 
                 for (PieceType p4 = PAWN; p4 <= p3; ++p4) {
-                    TBTables.add({KING, p1, p2, p3, p4, KING});
+                    _TBTables.add({KING, p1, p2, p3, p4, KING});
 
                     for (PieceType p5 = PAWN; p5 <= p4; ++p5)
-                        TBTables.add({KING, p1, p2, p3, p4, p5, KING});
+                        _TBTables.add({KING, p1, p2, p3, p4, p5, KING});
 
                     for (PieceType p5 = PAWN; p5 <= QUEEN; ++p5)
-                        TBTables.add({KING, p1, p2, p3, p4, KING, p5});
+                        _TBTables.add({KING, p1, p2, p3, p4, KING, p5});
                 }
 
                 for (PieceType p4 = PAWN; p4 <= QUEEN; ++p4) {
-                    TBTables.add({KING, p1, p2, p3, KING, p4});
+                    _TBTables.add({KING, p1, p2, p3, KING, p4});
 
                     for (PieceType p5 = PAWN; p5 <= p4; ++p5)
-                        TBTables.add({KING, p1, p2, p3, KING, p4, p5});
+                        _TBTables.add({KING, p1, p2, p3, KING, p4, p5});
                 }
             }
 
             for (PieceType p3 = PAWN; p3 <= p1; ++p3)
                 for (PieceType p4 = PAWN; p4 <= (p1 == p3 ? p2 : p3); ++p4)
-                    TBTables.add({KING, p1, p2, KING, p3, p4});
+                    _TBTables.add({KING, p1, p2, KING, p3, p4});
         }
     }
 
-    sync_cout << "info string Found " << TBTables.size() << " tablebases" << sync_endl;
+    sync_cout << "info string Found " << _TBTables.size() << " tablebases" << sync_endl;
 }
 
 // Probe the WDL table for a particular position.
