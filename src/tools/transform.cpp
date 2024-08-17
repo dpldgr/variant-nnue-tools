@@ -149,10 +149,11 @@ namespace Stockfish::Tools
 
             auto& ps = v.value();
 
-            pos.set_from_packed_sfen(ps.sfen, &si, th);
+            // TODO: move to new architecture.
+            //pos.set_from_packed_sfen(ps.sfen, &si, th); // FIXME.
             auto static_eval = Eval::evaluate(pos);
-            auto deep_eval = ps.score;
-            ps.score = nudge(params, static_eval, deep_eval);
+            //auto deep_eval = ps.score; // FIXME.
+            //ps.score = nudge(params, static_eval, deep_eval); // FIXME.
 
             buffer.emplace_back(ps);
             if (buffer.size() >= batch_size)
@@ -244,6 +245,7 @@ namespace Stockfish::Tools
 
     void do_rescore_epd(RescoreParams& params)
     {
+        /* FIXME.
         std::ifstream fens_file(params.input_filename);
 
         auto next_fen = [&fens_file, mutex = std::mutex{}]() mutable -> std::optional<std::string>{
@@ -341,6 +343,7 @@ namespace Stockfish::Tools
 
             std::cout << "Processed " << num_processed << " positions.\n";
         }
+        //*/
 
         std::cout << "Finished.\n";
     }
@@ -348,6 +351,7 @@ namespace Stockfish::Tools
     void do_rescore_data(RescoreParams& params)
     {
         // TODO: Use SfenReader once it works correctly in sequential mode. See issue #271
+        /* FIXME.
         auto in = Tools::open_sfen_input_file(params.input_filename);
         auto readsome = [&in, mutex = std::mutex{}](int n) mutable -> PSVector {
 
@@ -437,6 +441,7 @@ namespace Stockfish::Tools
             }
         });
         Threads.wait_for_workers_finished();
+        //*/
 
         std::cout << "Finished.\n";
     }

@@ -6,29 +6,77 @@
 
 namespace Stockfish::Tools {
 
-    // packed sfen
-    typedef std::array<uint8_t, DATA_SIZE/8+8> BinPosPacked;
-    typedef std::array<uint8_t, BIN2_DATA_SIZE/8> Bin2PosPacked;
+    // NOTE: Must be the same size as BinPackedPosValue for reinterpret_cast<BinPackedPosValue> to work.
+    struct BinPosFileData
+    {
+        std::uint8_t data[DATA_SIZE / 8 + 8]; // A position can use up to 72 bytes.
+    };
+
+    // NOTE: Must be the same size as Bin2PackedPosValue for reinterpret_cast<Bin2PackedPosValue> to work.
+    struct Bin2PosFileData
+    {
+        std::uint16_t size; // BIN2 is variable width rather than fixed width so needs a size field per postion.
+        std::uint8_t data[BIN2_DATA_SIZE / 8 + 7]; // A position can use up to 263 bytes.
+    };
 
     struct PackedPos
     {
-        uint8_t* data;
-        uint32_t size;
+        uint8_t* buffer = nullptr;
+        uint32_t buffer_size = 0;
+        uint32_t data_size = 0;
+
+        ~PackedPos()
+        { 
+            if ( buffer )
+                delete buffer;
+        }
+
+        virtual void set_result(int8_t result) {};
     };
 
-    struct PackedSfen { std::uint8_t data[DATA_SIZE / 8]; };
-    struct Bin2PackedPos { std::uint8_t data[BIN2_DATA_SIZE / 8]; };
+    struct BinPackedPos : public PackedPos
+    {
+        BinPackedPos()
+        {
+            buffer = reinterpret_cast<uint8_t*>(new BinPosFileData());
+            buffer_size = sizeof(BinPosFileData);
+            data_size = sizeof(BinPosFileData); // BIN has a fixed width position with a maximum size of 72 bytes.
+        }
 
-    struct BasePosValue {};
+        virtual void set_result(int8_t result)
+        {
+            // TODO.
+        }
+    };
+
+    struct Bin2PackedPos : public PackedPos
+    {
+        Bin2PackedPos()
+        {
+            buffer = reinterpret_cast<uint8_t*>(new Bin2PosFileData());
+            buffer_size = sizeof(Bin2PosFileData);
+            data_size = 0; // BIN2 has a variable width position with maximum size of 2^14 bytes.
+        }
+
+        virtual void set_result(int8_t result)
+        {
+            // TODO.
+        }
+    };
+
+    //struct PackedSfen { std::uint8_t data[DATA_SIZE / 8]; };
+    struct BinStreamData { std::uint8_t data[DATA_SIZE / 8]; };
+    struct Bin2StreamData { std::uint8_t data[BIN2_DATA_SIZE / 8]; };
 
     // Structure in which PackedSfen and evaluation value are integrated
     // If you write different contents for each option, it will be a problem when reusing the teacher game
     // For the time being, write all the following members regardless of the options.
-    struct PackedSfenValue : BasePosValue
+    // NOTE: Must be the same size as BinPosBytes.
+    //struct PackedSfenValue
+    struct BinPackedPosValue
     {
         // phase
-        std::uint8_t sfen[DATA_SIZE / 8]{};
-        //PackedSfen sfen;
+        BinStreamData stream_data;
 
         // Evaluation value returned from Tools::search()
         std::int16_t score;
@@ -52,7 +100,7 @@ namespace Stockfish::Tools {
         // 64 + 2 + 2 + 2 + 1 + 1 = 72bytes
     };
 
-    struct Bin2PackedPosValue : BasePosValue
+    struct Bin2PackedPosValue
     {
         // Evaluation value returned from Tools::search()
         std::int16_t score;
@@ -71,12 +119,10 @@ namespace Stockfish::Tools {
         std::int8_t game_result;
 
         // phase
-        //PackedSfen sfen;
-        std::uint8_t sfen[BIN2_DATA_SIZE / 8]{};
+        Bin2StreamData stream_data;
     };
 
     // Phase array: PSVector stands for packed sfen vector.
-    using PSVector = std::vector<PackedSfenValue>;
-    using PPVector = std::vector<Bin2PackedPosValue>;
+    using PSVector = std::vector<PackedPos>;
 }
 #endif

@@ -51,6 +51,7 @@ namespace Stockfish::Tools
         return str_input == str_pos;
     }
 
+    /* FIXME: this shouldn't be needed with the new architecture. PLAIN -> BIN?
     void convert_bin(
         const vector<string>& filenames,
         const string& output_file_name,
@@ -175,6 +176,7 @@ namespace Stockfish::Tools
         std::cout << "all done" << std::endl;
         fs.close();
     }
+    //*/
 
     static inline void ltrim(std::string& s) {
         s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
@@ -261,6 +263,7 @@ namespace Stockfish::Tools
         return count_space == 5 && count_slash == 7;
     }
 
+    /* FIXME: this shouldn't be needed with the new architecture.
     void convert_bin_from_pgn_extract(
         const vector<string>& filenames,
         const string& output_file_name,
@@ -463,7 +466,9 @@ namespace Stockfish::Tools
         std::cout << now_string() << " all done" << std::endl;
         ofs.close();
     }
+    //*/
 
+    /* FIXME: this shouldn't be needed with the new architecture. BIN -> PLAIN?
     void convert_plain(
         const vector<string>& filenames,
         const string& output_file_name)
@@ -503,6 +508,7 @@ namespace Stockfish::Tools
         ofs.close();
         std::cout << "all done" << std::endl;
     }
+    //*/
 
     static inline const std::string plain_extension = ".plain";
     static inline const std::string bin_extension = ".bin";
@@ -515,12 +521,14 @@ namespace Stockfish::Tools
         return f.good();
     }
 
+    /*
     static bool ends_with(const std::string& lhs, const std::string& end)
     {
         if (end.size() > lhs.size()) return false;
 
         return std::equal(end.rbegin(), end.rend(), lhs.rbegin());
     }
+    //*/
 
     static bool is_convert_of_type(
         const std::string& input_path,
@@ -535,40 +543,6 @@ namespace Stockfish::Tools
     class PosCodec
     {
     public:
-        static PosCodec* get_codec(const std::string& path)
-        {
-            if (ends_with(path, plain_extension))
-                return new PlainCodec();
-            else if (ends_with(path, bin_extension))
-                return new BinCodec();
-            else if (ends_with(path, bin2_extension))
-                return new Bin2Codec();
-            else
-                return nullptr;
-        }
-
-        static PosCodec* get_codec_ext(const std::string& ext)
-        {
-            if (ext == plain_extension)
-                return new PlainCodec();
-            else if (ext == bin_extension)
-                return new BinCodec();
-            else if (ext == bin2_extension)
-                return new Bin2Codec();
-            else
-                return nullptr;
-        }
-
-        static PosCodec* get_codec_type(const SfenOutputType type)
-        {
-            if (type == SfenOutputType::Bin)
-                return new BinCodec();
-            else if (type == SfenOutputType::Bin2)
-                return new Bin2Codec();
-            else
-                return nullptr;
-        }
-
         virtual bool is_decoder() { return false; };
         virtual bool is_encoder() { return false; };
 
@@ -717,7 +691,7 @@ namespace Stockfish::Tools
             const Square max_sq = (Square)63;
             PieceCode board[max_sq+1];
             //Piece board_pc[max_sq+1];
-            CodecHelper hlp(&pos, &si, v);
+            PosCodecHelper hlp(&pos, &si, v);
 
             stream.set_data(data);
             const int ply_count = stream.read_n_bit(16);
@@ -938,6 +912,40 @@ namespace Stockfish::Tools
         }
     };
 
+    static PosCodec* get_codec(const std::string& path)
+    {
+        if (ends_with(path, plain_extension))
+            return new PlainCodec();
+        else if (ends_with(path, bin_extension))
+            return new BinCodec();
+        else if (ends_with(path, bin2_extension))
+            return new Bin2Codec();
+        else
+            return nullptr;
+    }
+
+    static PosCodec* get_codec_ext(const std::string& ext)
+    {
+        if (ext == plain_extension)
+            return new PlainCodec();
+        else if (ext == bin_extension)
+            return new BinCodec();
+        else if (ext == bin2_extension)
+            return new Bin2Codec();
+        else
+            return nullptr;
+    }
+
+    static PosCodec* get_codec_type(const SfenOutputType type)
+    {
+        if (type == SfenOutputType::Bin)
+            return new BinCodec();
+        else if (type == SfenOutputType::Bin2)
+            return new Bin2Codec();
+        else
+            return nullptr;
+    }
+
     inline void convert(PosCodec& format1, vector<uint8_t>& data1, PosCodec& format2, vector<uint8_t>& data2)
     {
         Position pos;
@@ -1097,8 +1105,8 @@ namespace Stockfish::Tools
             return;
         }
 
-        PosCodec* format_in = PosCodec::get_codec(input_path);
-        PosCodec* format_out = PosCodec::get_codec(output_path);
+        PosCodec* format_in = get_codec(input_path);
+        PosCodec* format_out = get_codec(output_path);
         bool can_convert = true;
 
         // Each format has to be able to convert to/from a Position object, and input/output to their respective file format.
@@ -1208,6 +1216,7 @@ namespace Stockfish::Tools
         }
     }
 
+    /* FIXME: this shouldn't be needed with the new architecture.
     void convert_bin_from_pgn_extract(std::istringstream& is)
     {
         std::vector<std::string> filenames;
@@ -1262,7 +1271,9 @@ namespace Stockfish::Tools
             pgn_eval_side_to_move,
             convert_no_eval_fens_as_score_zero);
     }
+    //*/
 
+    /* FIXME: this shouldn't be needed with the new architecture.
     void convert_bin(std::istringstream& is)
     {
         std::vector<std::string> filenames;
@@ -1345,7 +1356,9 @@ namespace Stockfish::Tools
                 check_illegal_move
             );
     }
+    //*/
 
+    /* FIXME: this shouldn't be needed with the new architecture.
     void convert_plain(std::istringstream& is)
     {
         std::vector<std::string> filenames;
@@ -1391,4 +1404,5 @@ namespace Stockfish::Tools
         cout << "convert_plain.." << endl;
         convert_plain(filenames, output_file_name);
     }
+    //*/
 }

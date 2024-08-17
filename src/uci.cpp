@@ -397,9 +397,11 @@ void UCI::loop(int argc, char* argv[]) {
   else if (argc == 1 || !(std::strcmp(argv[1], "load") == 0))
   {
       // Check environment for variants.ini file
+      /* FIXME.
       char *envVariantPath = std::getenv("FAIRY_STOCKFISH_VARIANT_PATH");
       if (envVariantPath != NULL)
           Options["VariantPath"] = std::string(envVariantPath);
+      //*/
   }
 
   do {
@@ -496,9 +498,9 @@ void UCI::loop(int argc, char* argv[]) {
       else if (token == "generate_training_data") Tools::generate_training_data_nonpv(is);
       else if (token == "convert") Tools::convert(is);
       else if (token == "validate_training_data") Tools::validate_training_data(is);
-      else if (token == "convert_bin") Tools::convert_bin(is);
-      else if (token == "convert_plain") Tools::convert_plain(is);
-      else if (token == "convert_bin_from_pgn_extract") Tools::convert_bin_from_pgn_extract(is);
+      //else if (token == "convert_bin") Tools::convert_bin(is);
+      //else if (token == "convert_plain") Tools::convert_plain(is);
+      //else if (token == "convert_bin_from_pgn_extract") Tools::convert_bin_from_pgn_extract(is);
       else if (token == "transform") Tools::transform(is);
       else if (token == "gather_statistics") Tools::Stats::gather_statistics(is);
 

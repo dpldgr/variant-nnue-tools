@@ -204,7 +204,7 @@ namespace Stockfish::Tools
             if ((double)prng.rand<uint64_t>() / std::numeric_limits<uint64_t>::max() < params.exploration_save_rate)
             {
                 psv.emplace_back();
-                pos.sfen_pack(psv.back().sfen);
+                //pos.sfen_pack(psv.back().sfen); // FIXME.
             }
         });
 
@@ -280,7 +280,8 @@ namespace Stockfish::Tools
 
             for (auto& ps : packed_sfens)
             {
-                pos.set_from_packed_sfen(ps.sfen, &si, &th);
+                // TODO: move to new architecture.
+                //pos.set_from_packed_sfen(ps.sfen, &si, &th); // FIXME.
                 pos.state()->rule50 = 0;
 
                 if (params.smart_fen_skipping && pos.checkers())
@@ -305,6 +306,7 @@ namespace Stockfish::Tools
                     continue;
                 }
 
+                /* FIXME.
                 auto& new_ps = psv.emplace_back();
                 pos.sfen_pack(new_ps.sfen);
                 new_ps.score = search_value;
@@ -312,6 +314,7 @@ namespace Stockfish::Tools
                 new_ps.gamePly = 1;
                 new_ps.game_result = 0;
                 new_ps.padding = 0;
+                //*/
             }
 
             quit = commit_psv(th, psv, counter, limit);

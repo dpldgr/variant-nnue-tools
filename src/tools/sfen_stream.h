@@ -45,7 +45,7 @@ namespace Stockfish::Tools {
 
     struct BasicSfenInputStream
     {
-        virtual std::optional<PackedSfenValue> next() = 0;
+        virtual std::optional<PackedPos> next() = 0;
         virtual bool eof() const = 0;
         virtual ~BasicSfenInputStream() {}
     };
@@ -61,11 +61,14 @@ namespace Stockfish::Tools {
         {
         }
 
-        std::optional<PackedSfenValue> next() override
+        std::optional<PackedPos> next() override
         {
-            PackedSfenValue e;
-            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(PackedSfenValue)))
+            BinPackedPos e;
+            BinPosFileData f_data;
+
+            if (m_stream.read(reinterpret_cast<char*>(&f_data), sizeof(f_data)))
             {
+                // TODO: covert into PackedPos.
                 return e;
             }
             else
@@ -101,10 +104,10 @@ namespace Stockfish::Tools {
         {
         }
 
-        std::optional<PackedSfenValue> next() override
+        std::optional<PackedPos> next() override
         {
-            PackedSfenValue e;
-            uint16_t size;
+            Bin2PackedPos e;
+            Bin2PosFileData f_data;
 
             if (!header_read)
             {
@@ -115,8 +118,10 @@ namespace Stockfish::Tools {
                 header_read = true;
             }
 
-            if (m_stream.read(reinterpret_cast<uint8_t*>(&size), sizeof(size)) && m_stream.read(reinterpret_cast<uint8_t*>(&e), size))
+            if (m_stream.read(reinterpret_cast<uint8_t*>(&f_data.size), sizeof(f_data.size)) && m_stream.read(reinterpret_cast<uint8_t*>(&f_data.data), f_data.size))
             {
+                // TODO: covert to Bin2PackedPos.
+
                 return e;
             }
             else
@@ -138,6 +143,7 @@ namespace Stockfish::Tools {
         bool m_eof;
     };
 
+    /* TODO: Delete all this binpack stuff?
     struct BinpackSfenInputStream : BasicSfenInputStream
     {
         static constexpr auto openmode = std::ios::in | std::ios::binary;
@@ -179,6 +185,7 @@ namespace Stockfish::Tools {
         binpack::CompressedTrainingDataEntryReader m_stream;
         bool m_eof;
     };
+    //*/
 
     struct BasicSfenOutputStream
     {
@@ -198,7 +205,7 @@ namespace Stockfish::Tools {
 
         void write(const PSVector& sfens) override
         {
-            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(PackedSfenValue) * sfens.size());
+            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(BinPosFileData) * sfens.size());
         }
 
         ~BinSfenOutputStream() override {}
@@ -229,19 +236,21 @@ namespace Stockfish::Tools {
 
             for (auto& sfen : sfens)
             {
+                /* FIXME
                 int i = (DATA_SIZE / 8) - 1;
                 //int i = (BIN2_DATA_SIZE / 8) - 1;
 
                 for (; i >= 0; i--)
                 {
-                    if (sfen.sfen.data[i] != 0)
+                    if (sfen.stream_data.data[i] != 0)
                         break;
                 }
 
                 int write_size = (7 + i + 1) & 0x3FFF;
+                //*/
 
-                m_stream.write(reinterpret_cast<uint8_t*>(&write_size), 2);
-                m_stream.write(reinterpret_cast<const uint8_t*>(&sfen), write_size);
+                m_stream.write(reinterpret_cast<const uint8_t*>(&sfen.data_size), 2);
+                m_stream.write(reinterpret_cast<const uint8_t*>(&sfen.buffer), sfen.data_size);
             }
         }
 
@@ -251,6 +260,7 @@ namespace Stockfish::Tools {
         std::basic_fstream<uint8_t> m_stream;
     };
 
+    /* TODO: Delete all this binpack stuff?
     struct BinpackSfenOutputStream : BasicSfenOutputStream
     {
         static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
@@ -279,13 +289,16 @@ namespace Stockfish::Tools {
     private:
         binpack::CompressedTrainingDataEntryWriter m_stream;
     };
+    //*/
 
     inline std::unique_ptr<BasicSfenInputStream> open_sfen_input_file(const std::string& filename)
     {
         if (has_extension(filename, BinSfenInputStream::extension))
             return std::make_unique<BinSfenInputStream>(filename);
+        /* TODO: Delete all this binpack stuff?
         else if (has_extension(filename, BinpackSfenInputStream::extension))
             return std::make_unique<BinpackSfenInputStream>(filename);
+        //*/
         else if (has_extension(filename, Bin2InputStream::extension))
             return std::make_unique<Bin2InputStream>(filename);
 
@@ -298,8 +311,10 @@ namespace Stockfish::Tools {
         {
             case SfenOutputType::Bin:
                 return std::make_unique<BinSfenOutputStream>(filename);
+            /* TODO: Delete all this binpack stuff?
             case SfenOutputType::Binpack:
                 return std::make_unique<BinpackSfenOutputStream>(filename);
+            //*/
             case SfenOutputType::Bin2:
                 return std::make_unique<Bin2OutputStream>(filename);
         }
@@ -312,8 +327,10 @@ namespace Stockfish::Tools {
     {
         if (has_extension(filename, BinSfenOutputStream::extension))
             return std::make_unique<BinSfenOutputStream>(filename);
+        /* TODO: Delete all this binpack stuff?
         else if (has_extension(filename, BinpackSfenOutputStream::extension))
             return std::make_unique<BinpackSfenOutputStream>(filename);
+        //*/
         else if (has_extension(filename, Bin2OutputStream::extension))
             return std::make_unique<Bin2OutputStream>(filename);
 

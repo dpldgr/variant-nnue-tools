@@ -789,16 +789,16 @@ constexpr MoveType type_of(Move m) {
 }
 
 constexpr Square to_sq(Move m) {
-  return Square(m & SQUARE_BIT_MASK);
+  return Square(m & int(SQUARE_BIT_MASK));
 }
 
 constexpr Square from_sq(Move m) {
-  return type_of(m) == DROP ? SQ_NONE : Square((m >> SQUARE_BITS) & SQUARE_BIT_MASK);
+  return type_of(m) == DROP ? SQ_NONE : Square((m >> SQUARE_BITS) & int(SQUARE_BIT_MASK));
 }
 
 // Return relative square when turning the board 180 degrees
 constexpr Square rotate180(Square sq) {
-    return (Square)(sq ^ 0x3F);
+    return (Square)(int(sq) ^ 0x3F);
 }
 
 inline int from_to(Move m) {
@@ -814,7 +814,7 @@ inline PieceType gating_type(Move m) {
 }
 
 inline Square gating_square(Move m) {
-  return Square((m >> (2 * SQUARE_BITS + MOVE_TYPE_BITS + PIECE_TYPE_BITS)) & SQUARE_BIT_MASK);
+  return Square((m >> (2 * SQUARE_BITS + MOVE_TYPE_BITS + PIECE_TYPE_BITS)) & int(SQUARE_BIT_MASK));
 }
 
 inline bool is_gating(Move m) {

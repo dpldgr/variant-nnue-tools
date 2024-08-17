@@ -358,15 +358,17 @@ namespace Stockfish::Tools
                 if (ply >= params.write_minply && !was_seen_before(pos)
                     && !pos.checkers() && pos.nnue_applicable() && std::abs(qsearch_value - eval_value) <= params.eval_diff_limit)
                 {
-                    auto& psv = packed_sfens.emplace_back();
+                    PackedPos& psv = packed_sfens.emplace_back();
 
                     // Here we only write the position data.
                     // Result is added after the whole game is done.
-                    psv.sfen = Tools::sfen_pack(pos, params.sfen_format);
+                    /* FIXME.
+                    psv.buffer.sfen = Tools::sfen_pack(pos, params.sfen_format);
 
                     psv.score = search_value;
                     psv.move = search_pv[0];
                     psv.gamePly = ply;
+                    //*/
                 }
 
                 // Update the next move according to best search result or random move.
@@ -657,17 +659,20 @@ namespace Stockfish::Tools
             return false;
         }
 
+        /* FIXME: move this functionality into subclasses of PackedPos
         auto side_to_move_from_sfen = [](auto& sfen){
             return (Color)(sfen.sfen.data[0] & 1);
         };
+        //*/
 
         // From the final stage (one step before) to the first stage, give information on the outcome of the game for each stage.
         // The phases stored in sfens are assumed to be continuous (in order).
         for (auto it = sfens.rbegin(); it != sfens.rend(); ++it)
         {
             // The side to move is packed as the lowest bit of the first byte
-            const Color side_to_move = side_to_move_from_sfen(*it);
-            it->game_result = side_to_move == result_color ? result : -result;
+            //const Color side_to_move = side_to_move_from_sfen(*it); // FIXME: presumes BIN format.
+            //it->game_result = side_to_move == result_color ? result : -result; // FIXME: move this into subclasses of PackedPos.
+            it->set_result(result);
         }
 
         // Write sfens in move order to make potential compression easier

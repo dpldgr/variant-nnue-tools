@@ -113,7 +113,7 @@ typedef std::unique_ptr<std::deque<StateInfo>> StateListPtr;
 /// traversing the search tree.
 class Thread;
 
-class CodecHelper;
+class PosCodecHelper;
 
 class Position {
 public:
@@ -355,17 +355,21 @@ public:
 
   // --sfenization helper
 
-  friend int Tools::set_from_packed_sfen(Position& pos, const Tools::PackedSfen& sfen, StateInfo* si, Thread* th);
+
+  // TODO: remove this from class Position, this kind of thing is not it's responsibility.
+  //friend int Tools::set_from_packed_sfen(Position& pos, const Tools::PackedSfen& sfen, StateInfo* si, Thread* th);
 
   // Get the packed sfen. Returns to the buffer specified in the argument.
   // Do not include gamePly in pack.
-  void sfen_pack(Tools::PackedSfen& sfen);
+  // TODO: remove this from class Position, this kind of thing is not it's responsibility.
+  //void sfen_pack(Tools::PackedSfen& sfen);
 
   // It is slow to go through sfen, so I made a function to set packed sfen directly.
   // Equivalent to pos.set(sfen_unpack(data),si,th);.
   // If there is a problem with the passed phase and there is an error, non-zero is returned.
   // PackedSfen does not include gamePly so it cannot be restored. If you want to set it, specify it with an argument.
-  int set_from_packed_sfen(const Tools::PackedSfen& sfen, StateInfo* si, Thread* th);
+  // TODO: remove this from class Position, this kind of thing is not it's responsibility.
+  //int set_from_packed_sfen(const Tools::PackedSfen& sfen, StateInfo* si, Thread* th);
 
   void clear() { std::memset(this, 0, sizeof(Position)); }
 
@@ -377,6 +381,7 @@ public:
 
   void put_piece(Piece pc, Square s, bool isPromoted = false, Piece unpromotedPc = NO_PIECE);
   void remove_piece(Square s);
+
 
 private:
   // Initialization helpers (used while setting up a position)
@@ -417,14 +422,15 @@ private:
   void undrop_piece(Piece pc_hand, Square s);
   Bitboard find_drop_region(Direction dir, Square s, Bitboard occupied) const;
 
-  friend class CodecHelper;
+  friend class PosCodecHelper;
 };
 
-struct CodecHelper
+class PosCodecHelper
 {
+public:
     Position* pos;
 
-    CodecHelper(Position* p, StateInfo* s, const Variant* v)
+    PosCodecHelper(Position* p, StateInfo* s, const Variant* v)
         :pos(0)
     {
         assert(p != nullptr);

@@ -343,6 +343,7 @@ namespace Stockfish::Tools {
         return PieceCode(stream.read_n_bit(PieceCode::code_size));
     }
 
+    /* FIXME: should not be needed with new architecture.
     int set_from_packed_sfen(Position& pos, const PackedSfen& sfen, StateInfo* si, Thread* th)
     {
         SfenPacker packer;
@@ -461,6 +462,7 @@ namespace Stockfish::Tools {
 
         return 0;
     }
+    //*/
 
     inline std::unique_ptr<PosPacker> create_new_pos_packer(SfenOutputType sfen_output_type)
     {
@@ -479,24 +481,28 @@ namespace Stockfish::Tools {
     PackedPos sfen_pack(Position& pos, SfenOutputType sfen_format)
     {
         PackedPos ret;
-        PackedSfen bin_pos;
-        Bin2PackedPos bin2_pos;
+        //BinPackedPos bin_pos;
+        //Bin2PackedPos bin2_pos;
+        BinPackedPosValue bin_pos;
+        Bin2PackedPosValue bin2_pos;
+
+        PackedPos* r2 = new Bin2PackedPos();
 
         SfenPacker sp;
-        sp.data = bin_pos.data;
-        sp.data_v2 = bin2_pos.data;
+        sp.data = bin_pos.stream_data.data;
+        sp.data_v2 = bin2_pos.stream_data.data;
 
         if (sfen_format == SfenOutputType::Bin)
         {
             sp.pack(pos);
-            ret.data = bin_pos.data;
-            ret.size = sizeof(bin_pos);
+            ret.buffer = bin_pos.stream_data.data;
+            ret.buffer_size = sizeof(bin_pos);
         }
         else if (sfen_format == SfenOutputType::Bin2)
         {
             sp.pack_v2(pos);
-            ret.data = bin2_pos.data;
-            ret.size = sp.stream.get_cursor() / 8;
+            ret.buffer = bin2_pos.stream_data.data;
+            ret.buffer_size = sp.stream.get_cursor() / 8;
         }
 
         return ret;

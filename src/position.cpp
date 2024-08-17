@@ -3290,10 +3290,14 @@ bool Position::pos_is_ok() const {
 // Write it by combining packer::unpack() and Position::set().
 // If there is a problem with the passed phase and there is an error, non-zero is returned.
 // TODO: remove this from class Position, this kind of thing is not it's responsibility.
+
+/*
+// TODO: remove this from class Position, this kind of thing is not it's responsibility.
 int Position::set_from_packed_sfen(const Tools::PackedSfen& sfen , StateInfo* si, Thread* th)
 {
   return Tools::set_from_packed_sfen(*this, sfen, si, th);
 }
+//*/
 
 // Get the packed sfen. Returns to the buffer specified in the argument.
 /*
