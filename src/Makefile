@@ -368,8 +368,10 @@ endif
 
 ifeq ($(largedata),yes)
 	CXXFLAGS += -DDATA_SIZE=1024
+	CXXFLAGS += -DBIN2_DATA_SIZE=2048
 else
 	CXXFLAGS += -DDATA_SIZE=512
+	CXXFLAGS += -DBIN2_DATA_SIZE=2048
 endif
 
 ifeq ($(COMP),)
