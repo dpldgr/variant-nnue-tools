@@ -3,6 +3,7 @@
 #include "sfen_writer.h"
 #include "packed_sfen.h"
 #include "opening_book.h"
+#include "poscodec.h"
 
 #include "misc.h"
 #include "position.h"
@@ -130,6 +131,7 @@ namespace Stockfish::Tools
             params(prm),
             sfen_writer(prm.output_file_name, prm.num_threads, prm.save_every, prm.sfen_format)
         {
+            pos_codec = get_codec_type(prm.sfen_format);
             hash.resize(GENSFEN_HASH_SIZE);
             prngs.reserve(prm.num_threads);
             auto seed = prm.seed;
@@ -362,7 +364,8 @@ namespace Stockfish::Tools
 
                     // Here we only write the position data.
                     // Result is added after the whole game is done.
-                    psv = Tools::sfen_pack(pos);
+                    Tools::pos_codec->encode(pos);
+                    //psv = Tools::sfen_pack(pos);
                     //psv = Tools::sfen_pack(pos, params.sfen_format); // FIXME.
                     //psv.pack(pos, params.sfen_format); // FIXME.
 

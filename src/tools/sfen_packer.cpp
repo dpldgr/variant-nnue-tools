@@ -3,6 +3,7 @@
 #include "packed_sfen.h"
 #include "bitstream.h"
 #include "piececode.h"
+#include "poscodec.h"
 #include "sfen_stream.h"
 
 #include "misc.h"
@@ -18,6 +19,9 @@
 using namespace std;
 
 namespace Stockfish::Tools {
+
+    PosCodec* pos_codec = nullptr;
+    SfenOutputType data_format = SfenOutputType::Bin2;
 
     int PieceCode::code_size = PIECE_TYPE_BITS + 1;
 
@@ -478,22 +482,25 @@ namespace Stockfish::Tools {
 
     PackedPos sfen_pack(Position& pos)
     {
-        SfenOutputType sfen_format = SfenOutputType::Bin;
         PackedPos ret;
         BinPackedPosBuffer bin_buf;
         Bin2PackedPosBuffer bin2_buf;
+
+        PosCodec* cdc = get_codec_type(data_format);
+
+        cdc->encode(pos);
 
         SfenPacker sp;
         sp.data = bin_buf.data;
         sp.data_v2 = bin2_buf.data;
 
-        if (sfen_format == SfenOutputType::Bin)
+        if (data_format == SfenOutputType::Bin)
         {
             sp.pack(pos);
             ret.v->sfen = bin_buf;
             ret.data_size = sizeof(bin_buf);
         }
-        else if (sfen_format == SfenOutputType::Bin2)
+        else if (data_format == SfenOutputType::Bin2)
         {
             sp.pack_v2(pos);
             //ret.v->sfen = bin2_buf; // FIXME.

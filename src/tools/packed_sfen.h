@@ -69,8 +69,8 @@ namespace Stockfish::Tools {
     class PackedPos
     {
     public:
-        BinPackedPosValue* v;
-        int data_size = 0;
+        BinPackedPosValue* v = nullptr;
+        size_t data_size = 0;
 
         PackedPos()
         {
