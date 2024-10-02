@@ -337,16 +337,12 @@ namespace Stockfish::Tools {
         //assert(stream.get_cursor() <= BIN2_DATA_SIZE);
     }
 
-    void SfenPacker::unpack_v2(const Position& pos)
-    {
-
-    }
-
     PieceCode SfenPacker::read_piece_code_from_stream(const Position& pos)
     {
         return PieceCode(stream.read_n_bit(PieceCode::code_size));
     }
 
+    /*
     int set_from_packed_sfen(Position& pos, const BinPackedPosBuffer& sfen, StateInfo* si, Thread* th)
     {
         SfenPacker packer;
@@ -465,6 +461,7 @@ namespace Stockfish::Tools {
 
         return 0;
     }
+    //*/
 
     inline std::unique_ptr<PosPacker> create_new_pos_packer(SfenOutputType sfen_output_type)
     {
@@ -480,9 +477,10 @@ namespace Stockfish::Tools {
         return nullptr;
     }
 
+    /* { FIXME
     PackedPos sfen_pack(Position& pos)
     {
-        PackedPos ret;
+        PackedPos& ret = 0;
         BinPackedPosBuffer bin_buf;
         Bin2PackedPosBuffer bin2_buf;
 
@@ -497,16 +495,17 @@ namespace Stockfish::Tools {
         if (data_format == SfenOutputType::Bin)
         {
             sp.pack(pos);
-            ret.v->sfen = bin_buf;
-            ret.data_size = sizeof(bin_buf);
+            ret._data->sfen = bin_buf;
+            ret._size = sizeof(bin_buf);
         }
         else if (data_format == SfenOutputType::Bin2)
         {
             sp.pack_v2(pos);
             //ret.v->sfen = bin2_buf; // FIXME.
-            ret.data_size = ceil(sp.stream.get_cursor() / 8.0);
+            ret._size = ceil(sp.stream.get_cursor() / 8.0);
         }
 
         return ret;
     }
+    // } FIXME */
 }

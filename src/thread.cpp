@@ -243,8 +243,10 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
       }
   }
 
+  /* FIXME 
   if (!rootMoves.empty())
       Tablebases::rank_root_moves(pos, rootMoves);
+  //*/
 
   // After ownership transfer 'states' becomes empty, so if we stop the search
   // and call 'go' again without setting a new position states.get() == NULL.

@@ -284,7 +284,7 @@ namespace Stockfish::Tools::Stats
 
     struct StatisticGathererBase
     {
-        virtual void on_entry(const Position&, const Move&, const BinPackedPosValue&) {}
+        virtual void on_entry(const Position&, const Move&, const BinPackedPosFileData&) {}
         virtual void reset() = 0;
         [[nodiscard]] virtual const std::string& get_name() const = 0;
         [[nodiscard]] virtual StatisticOutput get_output() const = 0;
@@ -334,7 +334,7 @@ namespace Stockfish::Tools::Stats
             }
         }
 
-        void on_entry(const Position& pos, const Move& move, const BinPackedPosValue& psv) override
+        void on_entry(const Position& pos, const Move& move, const BinPackedPosFileData& psv) override
         {
             for (auto& g : m_gatherers)
             {
@@ -475,7 +475,7 @@ namespace Stockfish::Tools::Stats
         {
         }
 
-        void on_entry(const Position&, const Move&, const BinPackedPosValue&) override
+        void on_entry(const Position&, const Move&, const BinPackedPosFileData&) override
         {
             m_num_positions += 1;
         }
@@ -512,7 +512,7 @@ namespace Stockfish::Tools::Stats
 
         }
 
-        void on_entry(const Position& pos, const Move&, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move&, const BinPackedPosFileData&) override
         {
             m_white[pos.square<KING>(WHITE)] += 1;
             m_black[pos.square<KING>(BLACK)] += 1;
@@ -554,7 +554,7 @@ namespace Stockfish::Tools::Stats
 
         }
 
-        void on_entry(const Position& pos, const Move& move, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move& move, const BinPackedPosFileData&) override
         {
             if (pos.side_to_move() == WHITE)
                 m_white[from_sq(move)] += 1;
@@ -598,7 +598,7 @@ namespace Stockfish::Tools::Stats
 
         }
 
-        void on_entry(const Position& pos, const Move& move, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move& move, const BinPackedPosFileData&) override
         {
             if (pos.side_to_move() == WHITE)
                 m_white[to_sq(move)] += 1;
@@ -646,7 +646,7 @@ namespace Stockfish::Tools::Stats
 
         }
 
-        void on_entry(const Position& pos, const Move& move, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move& move, const BinPackedPosFileData&) override
         {
             m_total += 1;
 
@@ -709,7 +709,7 @@ namespace Stockfish::Tools::Stats
             reset();
         }
 
-        void on_entry(const Position& pos, const Move&, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move&, const BinPackedPosFileData&) override
         {
             m_piece_count_hist[popcount(pos.pieces())] += 1;
         }
@@ -757,7 +757,7 @@ namespace Stockfish::Tools::Stats
             reset();
         }
 
-        void on_entry(const Position& pos, const Move& move, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move& move, const BinPackedPosFileData&) override
         {
             m_moved_piece_type_hist[type_of(pos.piece_on(from_sq(move)))] += 1;
         }
@@ -799,7 +799,7 @@ namespace Stockfish::Tools::Stats
             reset();
         }
 
-        void on_entry(const Position& pos, const Move&, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move&, const BinPackedPosFileData&) override
         {
             const int current_ply = pos.game_ply();
             if (m_prev_ply != -1)
@@ -846,7 +846,7 @@ namespace Stockfish::Tools::Stats
             reset();
         }
 
-        void on_entry(const Position& pos, const Move&, const BinPackedPosValue&) override
+        void on_entry(const Position& pos, const Move&, const BinPackedPosFileData&) override
         {
             const int imbalance = get_simple_material(pos, WHITE) - get_simple_material(pos, BLACK);
             const int imbalance_idx = std::clamp(imbalance, -max_imbalance, max_imbalance) + max_imbalance;
@@ -913,7 +913,7 @@ namespace Stockfish::Tools::Stats
             reset();
         }
 
-        void on_entry(const Position& pos, const Move&, const BinPackedPosValue& psv) override
+        void on_entry(const Position& pos, const Move&, const BinPackedPosFileData& psv) override
         {
             const Color stm = pos.side_to_move();
             if (psv.game_result == 0)
@@ -980,7 +980,7 @@ namespace Stockfish::Tools::Stats
             reset();
         }
 
-        void on_entry(const Position& pos, const Move&, const BinPackedPosValue& psv) override
+        void on_entry(const Position& pos, const Move&, const BinPackedPosFileData& psv) override
         {
             const int piece_count = pos.count<ALL_PIECES>();
             if (piece_count > MaxManCount)
@@ -1195,7 +1195,7 @@ namespace Stockfish::Tools::Stats
 
         auto in = Tools::open_sfen_input_file(filename);
 
-        auto on_entry = [&](const Position& position, const Move& move, const BinPackedPosValue& psv) {
+        auto on_entry = [&](const Position& position, const Move& move, const BinPackedPosFileData& psv) {
             statistic_gatherers.on_entry(position, move, psv);
         };
 
@@ -1208,15 +1208,17 @@ namespace Stockfish::Tools::Stats
         uint64_t num_processed = 0;
         while (num_processed < max_count)
         {
-            auto v = in->next();
+            auto v = in->read();
             if (!v.has_value())
                 break;
 
-            BinPackedPosValue& psv = dynamic_cast<BinPackedPosValue&>(v.value());
+            /* FIXME. 
+            PosBuffer* psv = dynamic_cast<BinPosBuffer*>(v.value());
 
-            Tools::set_from_packed_sfen(pos,psv.sfen, &si, th);
+            //Tools::set_from_packed_sfen(pos,psv->sfen, &si, th); // FIXME.
 
-            on_entry(pos, (Move)psv.move, psv);
+            on_entry(pos, (Move)psv->move, *psv);
+            //*/
 
             num_processed += 1;
             if (num_processed % 1'000'000 == 0)

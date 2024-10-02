@@ -5,6 +5,7 @@
 #include "thread.h"
 #include "position.h"
 #include "poscodec.h"
+#include "sfen_stream.h"
 #include "variant.h"
 #include "tt.h"
 
@@ -30,6 +31,7 @@
 #include <random>
 #include <regex>
 #include <filesystem>
+#include <immintrin.h>
 
 using namespace std;
 namespace sys = std::filesystem;
@@ -83,7 +85,7 @@ namespace Stockfish::Tools
             std::string line;
             ifstream ifs;
             ifs.open(filename);
-            BinPackedPosValue p;
+            BinPackedPosFileData p;
             data_size = 0;
             filtered_size = 0;
             filtered_size_fen = 0;
@@ -108,7 +110,9 @@ namespace Stockfish::Tools
                         filtered_size_fen++;
                     }
                     else {
-                        tpos.sfen_pack(p.sfen);
+                        //tpos.sfen_pack(p.sfen); // FIXME.
+                        //Tools::pos_codec->encode(tpos); // FIXME.
+                        // FIXME: need to extract data after encoding.
                     }
                 }
                 else if (token == "move") {
@@ -154,7 +158,7 @@ namespace Stockfish::Tools
                 }
                 else if (token == "e") {
                     if (!(ignore_flag_fen || ignore_flag_move || ignore_flag_ply)) {
-                        fs.write((char*)&p, sizeof(BinPackedPosValue));
+                        fs.write((char*)&p, sizeof(BinPackedPosFileData));
                         data_size += 1;
                         // debug
                         // std::cout<<tpos<<std::endl;
@@ -319,8 +323,8 @@ namespace Stockfish::Tools
                     while (true) {
                         gamePly++;
 
-                        BinPackedPosValue psv;
-                        memset((char*)&psv, 0, sizeof(BinPackedPosValue));
+                        BinPackedPosFileData psv;
+                        memset((char*)&psv, 0, sizeof(BinPackedPosFileData));
 
                         // fen
                         {
@@ -342,7 +346,9 @@ namespace Stockfish::Tools
 
                                     StateInfo si;
                                     pos.set(pos.variant(), str_fen, false, &si, th);
-                                    pos.sfen_pack(psv.sfen);
+                                    //pos.sfen_pack(psv.sfen); // FIXME.
+                                    //Tools::pos_codec->encode(pos); // FIXME.
+                                    // FIXME: need to extract data after encoding.
                                 }
 
 #if defined(DEBUG_CONVERT_BIN_FROM_PGN_EXTRACT)
@@ -448,7 +454,7 @@ namespace Stockfish::Tools
                                 psv.game_result *= -1;
                             }
 
-                            ofs.write((char*)&psv, sizeof(BinPackedPosValue));
+                            ofs.write((char*)&psv, sizeof(BinPackedPosFileData));
 
                             fen_count++;
                         }
@@ -478,12 +484,12 @@ namespace Stockfish::Tools
             // Just convert packedsfenvalue to text
             std::fstream fs;
             fs.open(filename, ios::in | ios::binary);
-            BinPackedPosValue p;
+            BinPackedPosFileData p;
             while (true)
             {
-                if (fs.read((char*)&p, sizeof(BinPackedPosValue))) {
+                if (fs.read((char*)&p, sizeof(BinPackedPosFileData))) {
                     StateInfo si;
-                    Tools::set_from_packed_sfen(tpos, p.sfen, &si, th);
+                    //Tools::set_from_packed_sfen(tpos, p.sfen, &si, th); // FIXME.
 
                     // write as plain text
                     ofs << "fen " << tpos.fen() << std::endl;
@@ -504,10 +510,15 @@ namespace Stockfish::Tools
         std::cout << "all done" << std::endl;
     }
 
+    CodecRegister codecs;
+
     static inline const std::string plain_extension = ".plain";
     static inline const std::string bin_extension = ".bin";
     static inline const std::string binpack_extension = ".binpack";
     static inline const std::string bin2_extension = ".bin2";
+    static inline const std::string jpn_extension = ".jpn";
+    static inline const std::string fen_extension = ".fen";
+    static inline const std::string epd_extension = ".epd";
 
     static bool file_exists(const std::string& name)
     {
@@ -525,67 +536,29 @@ namespace Stockfish::Tools
             && ends_with(output_path, expected_output_extension);
     }
 
-
-    inline void convert(PosCodec& format1, vector<uint8_t>& data1, PosCodec& format2, vector<uint8_t>& data2)
+    inline void convert(PosCodec& codec_in, PosCodec& codec_out, std::string inputPath, std::string outputPath, std::ios_base::openmode om, bool validate)
     {
-        Position& pos = *new Position();
-
-        format1 = data1;
-        format1.decode(pos);
-        format2.encode(pos);
-        data2 = format2;
-    }
-
-    inline void convert(PosCodec& format_in, PosCodec& format_out, std::string inputPath, std::string outputPath, std::ios_base::openmode om, bool validate)
-    {
-        std::array<uint8_t, 256> buf;
-        constexpr std::size_t bufferSize = 1024 * 1024;
-
-        std::cout << "Converting from " << format_in.name() << " to " << format_out.name() << ".\n";
-        std::cout << " Input file: " << inputPath << "\n";
-        std::cout << "Output file: " << outputPath << "\n";
-        std::cout << "WARNING: not fully implemented yet.\n";
-
-        std::basic_ifstream<uint8_t> inputFile(inputPath, std::ios_base::binary);
-        const auto base = inputFile.tellg();
-        std::size_t numProcessedPositions = 0;
-
-        std::basic_ofstream<uint8_t> outputFile(outputPath, om);
-        std::string buffer;
-        buffer.reserve(bufferSize * 2);
-
+        unique_ptr<PosInputStream> file_in = open_sfen_input_file(inputPath);
+        unique_ptr<PosOutputStream> file_out = create_new_sfen_output(outputPath);
+        optional<PosBuffer*> pb_in;
+        PackedPosFileData* ppfd_out;
+        size_t numProcessedPositions = 0;
+        vector<PackedPosFileData*> ppos;
+        vector<PosBuffer*> pb_vec;
         Position pos;
-        vector<uint8_t> data_in;
-        vector<uint8_t> data_out;
+        PosData info(pos);
+        PosBuffer& data_in = codec_in.buffer();
+        PosBuffer& data_out = codec_out.buffer();
 
-        array<uint8_t,5> magic_ver = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
-        array<uint8_t,5> header{};
+        PieceCode::calc_code_size(6);
 
-        struct variant_info
-        {
-            uint8_t ranks;
-            uint8_t files;
-            uint16_t squares;
-            uint16_t piece_types;   
-        } vi;
 
-        if (!inputFile.read(header.data(), header.size()))
-        {
-            cout << "ERROR: couldn't open file.\n";
-            return;
-        }
+        cout << "Converting from " << codec_in.name() << " to " << codec_out.name() << ".\n";
+        cout << " Input file: " << inputPath << "\n";
+        cout << "Output file: " << outputPath << "\n";
+        cout << "WARNING: not fully implemented yet.\n";
 
-        if ( equal( header.begin(), header.end(), magic_ver.begin() ) )
-        {
-            cout << "Matched file magic and version.\n";
-        }
-        else
-        {
-            cerr << "ERROR: Didn't match file magic and version.\n";
-            return;
-        }
-
-        if (!inputFile.read(reinterpret_cast<uint8_t*>(&vi), sizeof(vi)))
+        if (file_in->eof())
         {
             cout << "ERROR: couldn't open file.\n";
             return;
@@ -595,62 +568,33 @@ namespace Stockfish::Tools
         {
             uint16_t size = 0;
 
-            if (!inputFile.read(reinterpret_cast<uint8_t*>(&size), sizeof(size)))
-            {
-                break;
-            }
+            pb_in = file_in->read();
 
-            if (!inputFile.read(buf.data(), size))
+            if ( pb_in.has_value() )
             {
-                break;
+                // FIXME: this only works with BIN2 atm.
+                //std::copy((*pb_in)->data() + 7, (*pb_in)->data() + 7 + (*pb_in)->size(), data_in.data());
+                std::copy((*pb_in)->data(), (*pb_in)->data() + (*pb_in)->size(), data_in.data());
+                data_in.size((*pb_in)->size());
+
+                    codec_in.decode(info);
+                    //PosData& info = codec_in.get_pos_info();
+                    //codec_out.set_pos_info(info);
+                    codec_out.encode(info);
+
+                pb_vec.emplace_back(codec_out.copy());
+
+                // TODO: write out after n positions.
             }
             else
             {
-                const uint16_t POSITION_MAGIC = 0;
-                const uint16_t magic = (size & 0xC000) >> 14;
-
-                // Check magic bits match.
-                if (magic == POSITION_MAGIC)
-                {
-                    //std::cout << "Matched position magic.\n";
-                }
-                else
-                {
-                    std::cout << "ERROR: POSITON_MAGIC should be 0 but it was " << magic << "\n";
-                    break;
-                }
-
-                const int copy_size = size - 7;
-                const Square max_sq = SQ_MAX; // TODO: get this from the file header.
-                const int piece_type_count = 6; // TODO: get this from the file header.
-                PieceCode board[SQ_MAX];
-                PieceCode::calc_code_size(piece_type_count);
-
-                data_in.clear();
-                data_in.insert(data_in.end(), buf.begin() + 7, buf.begin() + size);
-
-                if (copy_size <= (DATA_SIZE / 8))
-                {
-                    convert(format_in, data_in, format_out, data_out);
-                }
-                else
-                {
-                    std::cout << "BIN2 position is too large to convert. " << copy_size << " > " << (DATA_SIZE / 8) << '\n';
-                }
-
-                //std::cout << "BIN size: " << data_out.size() << '\n' << "BEFORE pos: " << outputFile.tellp() << '\n';
-                outputFile.seekp(72*numProcessedPositions);
-                //outputFile.write(reinterpret_cast<const char*>(data_out.data()), data_out.size());
-                outputFile.write(data_out.data(), data_out.size());
-                //std::cout << "AFTER pos: " << outputFile.tellp() << '\n';
+                break;
+            }
 
                 ++numProcessedPositions;
-            }
         }
 
-        outputFile.flush();
-        outputFile.close();
-        inputFile.close();
+        file_out->write(pb_vec);
 
         std::cout << "Finished. Converted " << numProcessedPositions << " positions.\n";
     }
@@ -685,53 +629,41 @@ namespace Stockfish::Tools
             return;
         }
 
-        PosCodec* format_in = get_codec(input_path);
-        PosCodec* format_out = get_codec(output_path);
+        PosCodec* codec_in = codecs.get_path(input_path);
+        PosCodec* codec_out = codecs.get_path(output_path);
         bool can_convert = true;
 
         // Each format has to be able to convert to/from a Position object, and input/output to their respective file format.
-        if (format_in == nullptr)
+        if (codec_in == nullptr)
         {
-            std::cerr << "No matching format found for file: " << input_path << ".\n";
+            std::cerr << "No matching codec found for file: " << input_path << ".\n";
             can_convert = false;
         }
-        else if (!format_in->is_decoder())
+        else if (!codec_in->is_decoder())
         {
-            std::cerr << "Format " << format_in->name() << " cannot be used as an input format.\n";
+            std::cerr << "Codec " << codec_in->name() << " cannot be used for decoding.\n";
             can_convert = false;
         }
 
-        if (format_out == nullptr)
+        if (codec_out == nullptr)
         {
-            std::cerr << "No matching format found for file: " << output_path << ".\n"; 
+            std::cerr << "No matching codec found for file: " << output_path << ".\n"; 
             can_convert = false;
         }
-        else if (!format_out->is_encoder())
+        else if (!codec_out->is_encoder())
         {
-            std::cerr << "Format " << format_out->name() << " cannot be used as an output format.\n";
+            std::cerr << "Codec " << codec_out->name() << " cannot be used for encoding.\n";
             can_convert = false;
         }
 
         if ( can_convert )
         {
-            convert(*format_in, *format_out, input_path, output_path, om, validate);
+            convert(*codec_in, *codec_out, input_path, output_path, om, validate);
         }
         else
         {
             std::cerr << "Conversion between these file formats is not supported.\n";
         }
-
-        /* TODO: replace this.
-        auto func = get_convert_function(input_path, output_path);
-        if (func != nullptr)
-        {
-            func(input_path, output_path, om, validate);
-        }
-        else
-        {
-            std::cerr << "Conversion between files of these types is not supported.\n";
-        }
-        //*/
     }
 
     static void convert(const std::vector<std::string>& args)

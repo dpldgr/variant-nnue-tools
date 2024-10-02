@@ -77,14 +77,14 @@ namespace Stockfish::Tools{
         }
 
         // Load the phase for calculation such as mse.
-        PSVector read_some(uint64_t count, uint64_t count_tries, std::function<bool(const BinPackedPosValue&)> do_take)
+        PPVector read_some(uint64_t count, uint64_t count_tries, std::function<bool(const BinPackedPosFileData&)> do_take)
         {
-            PSVector psv;
+            PPVector psv;
             psv.reserve(count);
 
             for (uint64_t i = 0; i < count_tries; ++i)
             {
-                BinPackedPosValue ps;
+                BinPackedPosFileData ps;
                 if (!read_to_thread_buffer(0, ps))
                 {
                     std::cout << "ERROR (sfen_reader): Reading failed." << std::endl;
@@ -104,7 +104,7 @@ namespace Stockfish::Tools{
         }
 
         // [ASYNC] Thread returns one aspect. Otherwise returns false.
-        bool read_to_thread_buffer(size_t thread_id, BinPackedPosValue& ps)
+        bool read_to_thread_buffer(size_t thread_id, BinPackedPosFileData& ps)
         {
             // If there are any positions left in the thread buffer
             // then retrieve one and return it.
@@ -232,13 +232,13 @@ namespace Stockfish::Tools{
                 if (stop_flag)
                     return;
 
-                PSVector sfens;
+                PPVector sfens;
                 sfens.reserve(sfen_read_size);
 
                 // Read from the file into the file buffer.
                 while (sfens.size() < sfen_read_size)
                 {
-                    std::optional<BinPackedPosValue> p = sfen_input_stream->next();
+                    std::optional<BinPackedPosFileData> p = sfen_input_stream->next();
                     if (p.has_value())
                     {
                         sfens.push_back(*p);
@@ -270,7 +270,7 @@ namespace Stockfish::Tools{
                     Algo::shuffle(sfens, prng);
                 }
 
-                std::vector<std::unique_ptr<PSVector>> buffers;
+                std::vector<std::unique_ptr<PPVector>> buffers;
                 for (size_t offset = 0; offset < sfens.size(); offset += thread_buffer_size)
                 {
                     const size_t count =
@@ -279,12 +279,12 @@ namespace Stockfish::Tools{
                         : thread_buffer_size;
 
                     // Delete this pointer on the receiving side.
-                    auto buf = std::make_unique<PSVector>();
+                    auto buf = std::make_unique<PPVector>();
                     buf->resize(count);
                     memcpy(
                         buf->data(),
                         &sfens[offset],
-                        sizeof(BinPackedPosValue) * count);
+                        sizeof(BinPackedPosFileData) * count);
 
                     buffers.emplace_back(std::move(buf));
                 }
@@ -334,11 +334,11 @@ namespace Stockfish::Tools{
         std::atomic<bool> end_of_files;
 
         // handle of sfen file
-        std::unique_ptr<BasicSfenInputStream> sfen_input_stream;
+        std::unique_ptr<PosInputStream> sfen_input_stream;
 
         // sfen for each thread
         // (When the thread is used up, the thread should call delete to release it.)
-        std::vector<std::unique_ptr<PSVector>> packed_sfens;
+        std::vector<std::unique_ptr<PPVector>> packed_sfens;
 
         // Mutex when accessing packed_sfens_pool
         std::mutex mutex;
@@ -346,7 +346,7 @@ namespace Stockfish::Tools{
         // pool of sfen. The worker thread read from the file is added here.
         // Each worker thread fills its own packed_sfens[thread_id] from here.
         // * Lock and access the mutex.
-        std::list<std::unique_ptr<PSVector>> packed_sfens_pool;
+        std::list<std::unique_ptr<PPVector>> packed_sfens_pool;
         std::atomic<size_t> num_buffers_in_pool;
     };
 }

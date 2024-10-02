@@ -40,6 +40,18 @@
 
 namespace Stockfish {
 
+    struct FenData
+    {
+    public:
+        Piece board[SQUARE_NB];
+        int in_hand[PIECE_NB];
+        Bitboard ep_squares;
+        int castling_rights;
+        int n_move_ply;
+        int move_ply;
+    };
+
+
 /// StateInfo struct stores information needed to restore a Position object to
 /// its previous state when we retract a move. Whenever a move is made on the
 /// board (by calling Position::do_move), a StateInfo object must be passed.
@@ -124,6 +136,7 @@ public:
   Position& operator=(const Position&) = delete;
 
   // FEN string input/output
+  Position& set(const FenData* fen, StateInfo* si, Thread* th);
   Position& set(const Variant* v, const std::string& fenStr, bool isChess960, StateInfo* si, Thread* th, bool sfen = false);
   Position& set(const std::string& code, Color c, StateInfo* si);
   std::string fen(bool sfen = false, bool showPromoted = false, int countStarted = 0, std::string holdings = "-") const;
@@ -355,17 +368,17 @@ public:
 
   // --sfenization helper
 
-  friend int Tools::set_from_packed_sfen(Position& pos, const Tools::BinPackedPosBuffer& sfen, StateInfo* si, Thread* th);
+  //friend int Tools::set_from_packed_sfen(Position& pos, const Tools::BinPackedPosBuffer& sfen, StateInfo* si, Thread* th);
 
   // Get the packed sfen. Returns to the buffer specified in the argument.
   // Do not include gamePly in pack.
-  void sfen_pack(Tools::BinPackedPosBuffer& sfen);
+  //void sfen_pack(Tools::BinPackedPosBuffer& sfen);
 
   // It is slow to go through sfen, so I made a function to set packed sfen directly.
   // Equivalent to pos.set(sfen_unpack(data),si,th);.
   // If there is a problem with the passed phase and there is an error, non-zero is returned.
   // PackedSfen does not include gamePly so it cannot be restored. If you want to set it, specify it with an argument.
-  int set_from_packed_sfen(const Tools::BinPackedPosBuffer& sfen, StateInfo* si, Thread* th);
+  //int set_from_packed_sfen(const Tools::BinPackedPosBuffer& sfen, StateInfo* si, Thread* th);
 
   void clear() { std::memset(this, 0, sizeof(Position)); }
 
@@ -424,6 +437,7 @@ class PosCodecHelper
 {
 public:
     Position* pos;
+    StateListPtr states;
 
     PosCodecHelper(Position* p, StateInfo* s, const Variant* v)
         :pos(0)
@@ -437,6 +451,35 @@ public:
         p->st = s;
         p->var = v;
         p->st->castlingKingSquare[WHITE] = p->st->castlingKingSquare[BLACK] = SQ_NONE;
+        p->chess960 = false;
+    }
+
+    void new_states()
+    {
+        states = StateListPtr(new std::deque<StateInfo>(1));
+        pos->st = &states->back();
+        set_state();
+    }
+
+    void set_thread(Thread* th)
+    {
+        pos->thisThread = th;
+    }
+
+    void clear_sq(Square sq)
+    {
+        pos->board[sq] = NO_PIECE;
+    }
+
+    void set_state()
+    {
+        pos->set_state(pos->st);
+    }
+
+    void side_to_move(int color)
+    {
+        assert(pos != nullptr);
+        pos->sideToMove = (Color)color;
     }
 
     void set_castle(CastlingRights cr) {
@@ -453,6 +496,12 @@ public:
     {
         assert(pos->st != nullptr);
         pos->st->rule50 = count;
+    }
+
+    void ply_from_start(int count)
+    {
+        assert(pos->st != nullptr);
+        pos->gamePly = count + 1;
     }
 };
 

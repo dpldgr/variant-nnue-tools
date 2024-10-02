@@ -49,7 +49,10 @@ struct Variant {
   std::string pieceToChar =  " PNBRQ" + std::string(KING - QUEEN - 1, ' ') + "K" + std::string(PIECE_TYPE_NB - KING - 1, ' ')
                            + " pnbrq" + std::string(KING - QUEEN - 1, ' ') + "k" + std::string(PIECE_TYPE_NB - KING - 1, ' ');
   std::string pieceToCharSynonyms = std::string(PIECE_NB, ' ');
+  std::string pieceNotation[128] = { "", "P", "N", "B", "R", "Q", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "T", "A", "+A", "Z", "+Z", "G", "+G", "E", "+E", "L", "S", "F", "+F", "J", "+J", "H", "", "", "", "", "","", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", };
+  std::string pieceNames[128]    = { "", "P", "N", "B", "R", "Q", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "T", "A", "+A", "Z", "+Z", "G", "+G", "E", "+E", "L", "S", "F", "+F", "J", "+J", "H", "", "", "", "", "","", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", };
   std::string startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  std::string startposFile = "";
   Bitboard mobilityRegion[COLOR_NB][PIECE_TYPE_NB] = {};
   Bitboard promotionRegion[COLOR_NB] = {Rank8BB, Rank1BB};
   PieceType promotionPawnType[COLOR_NB] = {PAWN, PAWN};

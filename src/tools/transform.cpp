@@ -135,7 +135,7 @@ namespace Stockfish::Tools
             return;
         }
 
-        PSVector buffer;
+        PPVector buffer;
         uint64_t batch_size = 1'000'000;
 
         buffer.reserve(batch_size);
@@ -265,7 +265,7 @@ namespace Stockfish::Tools
         };
         //*/
 
-        PSVector buffer;
+        PPVector buffer;
         uint64_t batch_size = 10'000;
 
         buffer.reserve(batch_size);
@@ -314,7 +314,7 @@ namespace Stockfish::Tools
                 if (search_pv.empty())
                     continue;
 
-                BinPackedPosValue ps;
+                BinPackedPosFileData ps;
                 pos.sfen_pack(ps.sfen);
                 ps.score = search_value;
                 ps.move = search_pv[0];
@@ -354,19 +354,19 @@ namespace Stockfish::Tools
     void do_rescore_data(RescoreParams& params)
     {
         // TODO: Use SfenReader once it works correctly in sequential mode. See issue #271
-        auto in = Tools::open_sfen_input_file(params.input_filename);
+        unique_ptr<PosInputStream> in = Tools::open_sfen_input_file(params.input_filename);
 
         /* FIXME.
-        auto readsome = [&in, mutex = std::mutex{}](int n) mutable -> PSVector {
+        auto readsome = [&in, mutex = std::mutex{}](int n) mutable -> PPVector {
 
-            PSVector psv;
+            PPVector psv;
             psv.reserve(n);
 
             std::unique_lock lock(mutex);
 
             for (int i = 0; i < n; ++i)
             {
-                auto ps_opt = in->next();
+                auto ps_opt = in->read();
                 if (ps_opt.has_value())
                 {
                     psv.emplace_back(*ps_opt);
@@ -414,13 +414,14 @@ namespace Stockfish::Tools
 
             for (;;)
             {
-                PSVector psv = readsome(5000);
+                PPVector psv = readsome(5000);
                 if (psv.empty())
                     break;
 
                 for(auto& ps : psv)
                 {
-                    pos.set_from_packed_sfen(ps.v->sfen, &si, &th);
+                    //pos.set_from_packed_sfen(ps.v->sfen, &si, &th);
+                    // PosCodec::decode();
 
                     for (int cnt = 0; cnt < params.research_count; ++cnt)
                         Search::search(pos, params.depth, 1);
@@ -430,7 +431,8 @@ namespace Stockfish::Tools
                     if (search_pv.empty())
                         continue;
 
-                    pos.sfen_pack(ps.v->sfen);
+                    //pos.sfen_pack(ps.v->sfen);
+                    // PosCodec::encode();
                     ps.v->score = search_value;
                     if (!params.keep_moves)
                         ps.v->move = search_pv[0];

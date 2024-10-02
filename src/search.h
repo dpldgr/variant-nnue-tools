@@ -93,6 +93,7 @@ struct LimitsType {
     movestogo = depth = mate = perft = infinite = 0;
     nodes = 0;
     silent = false;
+    depthnodes = false;
   }
 
   bool use_time_management() const {
@@ -106,6 +107,7 @@ struct LimitsType {
   // Silent mode that does not output to the screen (for continuous self-play in process)
   // Do not output PV at this time.
   bool silent;
+  bool depthnodes;
 };
 
 extern LimitsType Limits;

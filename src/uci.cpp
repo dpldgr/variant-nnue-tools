@@ -22,6 +22,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <iomanip>
 
 #include "nnue/evaluate_nnue.h"
 #include "evaluate.h"
@@ -39,16 +40,29 @@
 #include "tools/training_data_generator.h"
 #include "tools/training_data_generator_nonpv.h"
 #include "tools/convert.h"
+#include "tools/extract.h"
 #include "tools/transform.h"
 #include "tools/stats.h"
 
 using namespace std;
+
+void _testing(std::istringstream& is);
 
 namespace Stockfish {
 
 extern vector<string> setup_bench(const Position&, istream&);
 
 namespace {
+
+    template<typename T>
+    T convert(string value, int base = 10)
+    {
+        T ret;
+        stringstream ss;
+        ss << setbase(base) << value;
+        ss >> ret;
+        return ret;
+    }
 
   // position() is called when engine receives the "position" UCI command.
   // The function sets up the position described in the given FEN string ("fen")
@@ -58,7 +72,7 @@ namespace {
   void position(Position& pos, istringstream& is, StateListPtr& states) {
 
     Move m;
-    string token, fen;
+    string token, fen, opn;
 
     is >> token;
     // Parse as SFEN if specified
@@ -68,15 +82,118 @@ namespace {
     {
         fen = variants.find(Options["UCI_Variant"])->second->startFen;
         is >> token; // Consume "moves" token if any
+        if (token != "moves")
+        {
+            // Select random
+            if (token == "random")
+            {
+                cout << "RANDOM: position startpos random\n";
+            }
+            // Select index.
+            else if (token.find_first_not_of("0123456789") == string::npos)
+            {
+                cout << "INDEX: position startpos " << token << "\n";
+            }
+            else
+            {
+                cout << "UNKNOWN: position startpos " << token << "\n";
+            }
+        }
     }
     else if (token == "fen" || token == "sfen")
         while (is >> token && token != "moves")
             fen += token + " ";
+    else if (token == "opn")
+    {
+        FenData fd {};
+        is >> opn;
+        string opn_new = opn.substr(1, opn.size() - 2);
+        string tmp,key,val;
+        stringstream opn_ss(opn_new);
+        unordered_map<string, string> dict;
+        vector<Piece> squares;
+
+        squares.reserve(128);
+
+        while (getline(opn_ss, tmp, ','))
+        {
+            stringstream tmp_ss(tmp);
+            getline(tmp_ss, key, ':');
+            getline(tmp_ss, val, ':');
+            dict[key] = val;
+        }
+
+        string pieces = dict["b"];
+        uint32_t piece, count;
+
+        // Parse piece codes.
+        for (int i = 0; i < dict["b"].size();)
+        {
+            if (isxdigit(pieces[i]))
+            {
+                piece = convert<uint32_t>(pieces.substr(i, 2), 16);
+                count = 1;
+                i += 2;
+            }
+            // There are x squares with the same code; 
+            else if (pieces[i] == 'x')
+            {
+                count = convert<uint32_t>(pieces.substr(i + 1, 1), 16);
+                count--;
+                i += 2;
+            }
+            // Repeat last square x times; 
+            else if (pieces[i] == 'r')
+            {
+                count = convert<uint32_t>(pieces.substr(i + 1, 2), 16);
+                i += 3;
+            }
+            // Skip x squares.
+            else if (pieces[i] == 's')
+            {
+                count = convert<uint32_t>(pieces.substr(i + 1, 2), 16);
+                piece = 0;
+                i += 3;
+            }
+
+            for (int j = 0; j < count; j++)
+                squares.push_back((Piece)piece);
+
+        }
+
+        for (int i = 0; i < SQ_MAX; i++)
+        {
+            fd.board[i] = squares[i];
+        }
+
+        // TODO: Parse castling.
+
+        // Parse en passant.
+        string ep_squares = dict["e"];
+        uint64_t ep_square;
+
+        for (int i = 0; i < dict["e"].size();)
+        {
+            ep_square = convert<uint64_t>(ep_squares.substr(i, 2),16);
+            fd.ep_squares |= (uint64_t(1) << ep_square);
+            i += 2;
+        }
+
+        // TODO: Parse drops.
+        string drops = dict["d"];
+
+        // Parse move ply counter.
+        fd.move_ply = convert<uint32_t>(dict["m"]);
+
+        // Parse n-move ply counter.
+        fd.n_move_ply = convert<uint32_t>(dict["n"]);
+    }
     else
         return;
 
     states = StateListPtr(new std::deque<StateInfo>(1)); // Drop old and create a new one
     pos.set(variants.find(Options["UCI_Variant"])->second, fen, Options["UCI_Chess960"], &states->back(), Threads.main(), sfen);
+    // TODO: create new set function for hpn format.
 
     // Parse move list (if any)
     while (is >> token && (m = UCI::to_move(pos, token)) != MOVE_NONE)
@@ -159,6 +276,11 @@ namespace {
         else if (token == "movestogo") is >> limits.movestogo;
         else if (token == "depth")     is >> limits.depth;
         else if (token == "nodes")     is >> limits.nodes;
+        else if (token == "depthnodes") 
+        { 
+            limits.depthnodes = true; 
+            is >> limits.depth >> limits.nodes;
+        }
         else if (token == "movetime")  is >> limits.movetime;
         else if (token == "mate")      is >> limits.mate;
         else if (token == "perft")     is >> limits.perft;
@@ -497,6 +619,8 @@ void UCI::loop(int argc, char* argv[]) {
       else if (token == "generate_training_data") Tools::generate_training_data(is);
       else if (token == "generate_training_data") Tools::generate_training_data_nonpv(is);
       else if (token == "convert") Tools::convert(is);
+      else if (token == "extract") Tools::extract(is);
+      else if (token == "_testing") _testing(is);
       else if (token == "validate_training_data") Tools::validate_training_data(is);
       else if (token == "convert_bin") Tools::convert_bin(is);
       else if (token == "convert_plain") Tools::convert_plain(is);

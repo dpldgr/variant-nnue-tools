@@ -2,6 +2,7 @@
 #define _SFEN_STREAM_H_
 
 #include "packed_sfen.h"
+#include "posbuffer.h"
 
 #include "extra/nnue_data_binpack_format.h"
 
@@ -9,6 +10,9 @@
 #include <fstream>
 #include <string>
 #include <memory>
+#include <vector>
+
+using namespace std;
 
 namespace Stockfish::Tools {
 
@@ -17,6 +21,20 @@ namespace Stockfish::Tools {
         Bin,
         Binpack,
         Bin2,
+        Plain,
+        Fen,
+        Epd,
+        Jpn,
+    };
+
+    enum struct PosCodecType
+    {
+        Bin,
+        Binpack,
+        Bin2,
+        Plain,
+        FEN,
+        EPD,
     };
 
     static bool ends_with(const std::string& lhs, const std::string& end)
@@ -43,28 +61,30 @@ namespace Stockfish::Tools {
         }
     }
 
-    struct BasicSfenInputStream
+    struct PosInputStream
     {
-        virtual std::optional<PackedPosValue> next() = 0;
+        virtual std::optional<PosBuffer*> read() = 0;
         virtual bool eof() const = 0;
-        virtual ~BasicSfenInputStream() {}
+        virtual bool is_open() const = 0;
+        virtual ~PosInputStream() {}
     };
 
-    struct BinSfenInputStream : BasicSfenInputStream
+    struct BinPosInputStream : PosInputStream
     {
         static constexpr auto openmode = std::ios::in | std::ios::binary;
         static inline const std::string extension = "bin";
 
-        BinSfenInputStream(std::string filename) :
+        BinPosInputStream(std::string filename) :
             m_stream(filename, openmode),
             m_eof(!m_stream)
         {
         }
 
-        std::optional<PackedPosValue> next() override
+        std::optional<PosBuffer*> read() override
         {
-            BinPackedPosValue e;
-            if (m_stream.read(reinterpret_cast<char*>(&e), sizeof(BinPackedPosValue)))
+            BinPosBuffer* e = new BinPosBuffer();
+
+            if (m_stream.read(reinterpret_cast<char*>(e->data()), e->size()))
             {
                 return e;
             }
@@ -80,44 +100,61 @@ namespace Stockfish::Tools {
             return m_eof;
         }
 
-        ~BinSfenInputStream() override {}
+        bool is_open() const override
+        {
+            return m_stream.is_open();
+        }
+
+        ~BinPosInputStream() override {}
 
     private:
         std::fstream m_stream;
         bool m_eof;
     };
 
-    struct Bin2InputStream : BasicSfenInputStream
+    struct Bin2PosInputStream : PosInputStream
     {
         static constexpr auto openmode = std::ios::in | std::ios::binary;
         static inline const std::string extension = "bin2";
+        //static constexpr std::array<uint8_t, 4> file_header = { 0xFE, 0xB7, 0xD2, 0x2F }; // Magic is the first four bytes of SHA256('{type:"bin2",version:"1.0"}').
         static constexpr std::array<uint8_t, 5> file_header = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
         bool header_read = false;
         bool header_match = false;
 
-        Bin2InputStream(std::string filename) :
+        Bin2PosInputStream(std::string filename) :
             m_stream(filename, openmode),
             m_eof(!m_stream)
         {
         }
 
-        std::optional<PackedPosValue> next() override
+        std::optional<PosBuffer*> read()
         {
-            Bin2PackedPosValue e;
-            uint16_t size;
+            Bin2PosBuffer* pb = new Bin2PosBuffer();
+            size_t loc = 0;
+            uint16_t pos_size = 0;
 
             if (!header_read)
             {
                 std::array<uint8_t, 5> header_data;
                 m_stream.read(header_data.data(), header_data.size());
-                if ( std::equal(header_data.begin(), header_data.end(), file_header.begin()) )
+                if (std::equal(header_data.begin(), header_data.end(), file_header.begin()))
                     header_match = true;
                 header_read = true;
             }
 
-            if (m_stream.read(reinterpret_cast<uint8_t*>(&size), sizeof(size)) && m_stream.read(reinterpret_cast<uint8_t*>(&e), size))
+            if (m_stream.read(reinterpret_cast<uint8_t*>(&pos_size), sizeof(pos_size)))
             {
-                return e;
+                pb->size(pos_size);
+
+                if (m_stream.read(pb->data(), pos_size))
+                {
+                    return pb;
+                }
+                else
+                {
+                    m_eof = true;
+                    return std::nullopt;
+                }
             }
             else
             {
@@ -131,27 +168,32 @@ namespace Stockfish::Tools {
             return m_eof;
         }
 
-        ~Bin2InputStream() override {}
+        bool is_open() const override
+        {
+            return m_stream.is_open();
+        }
+
+        ~Bin2PosInputStream() override {}
 
     private:
         std::basic_fstream<uint8_t> m_stream;
         bool m_eof;
     };
 
-    struct BinpackSfenInputStream : BasicSfenInputStream
+    struct BinpackPosInputStream : PosInputStream
     {
         static constexpr auto openmode = std::ios::in | std::ios::binary;
         static inline const std::string extension = "binpack";
 
-        BinpackSfenInputStream(std::string filename) :
+        BinpackPosInputStream(std::string filename) :
             m_stream(filename, openmode),
             m_eof(!m_stream.hasNext())
         {
         }
 
-        std::optional<PackedPosValue> next() override
+        std::optional<PosBuffer*> read() override
         {
-            //static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(BinPackedPosValue)); // FIXME.
+            //static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(BinPackedPosFileData)); // FIXME.
 
             if (!m_stream.hasNext())
             {
@@ -161,11 +203,12 @@ namespace Stockfish::Tools {
 
             auto training_data_entry = m_stream.next();
             auto v = binpack::trainingDataEntryToPackedSfenValue(training_data_entry);
-            BinPackedPosValue psv;
+            BinPackedPosFileData* psv = new BinPackedPosFileData();
             // same layout, different types. One is from generic library.
-            std::memcpy(&psv, &v, sizeof(BinPackedPosValue));
+            std::memcpy(psv, &v, sizeof(BinPackedPosFileData));
 
-            return psv;
+            //return psv;
+            return std::nullopt; // FIXME.
         }
 
         bool eof() const override
@@ -173,97 +216,290 @@ namespace Stockfish::Tools {
             return m_eof;
         }
 
-        ~BinpackSfenInputStream() override {}
+        bool is_open() const override
+        {
+            // TODO.
+
+            return false;
+        }
+
+        ~BinpackPosInputStream() override {}
 
     private:
         binpack::CompressedTrainingDataEntryReader m_stream;
         bool m_eof;
     };
 
-    struct BasicSfenOutputStream
+    struct PosOutputStream
     {
-        virtual void write(const PSVector& sfens) = 0;
-        virtual ~BasicSfenOutputStream() {}
+        virtual void write_header() {};
+        virtual void write_footer() {};
+        virtual void write(const vector<string*>& strs) {};
+        virtual void write(PosBuffer* pb) = 0;
+        virtual void write(const std::vector<PosBuffer*>& pb) = 0;
+        virtual void write(const std::vector<PackedPosFileData*>& ppfd) = 0;
+        virtual void write(const PPVector& sfens) = 0;
+        //virtual void last_pos( bool v ) = 0;
+        virtual bool is_open() const = 0;
+        virtual ~PosOutputStream() {}
     };
 
-    struct BinSfenOutputStream : BasicSfenOutputStream
+    struct AbstractPosOutputStream
+        : public PosOutputStream
     {
-        static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
-        static inline const std::string extension = "bin";
-
-        BinSfenOutputStream(std::string filename) :
-            m_stream(filename_with_extension(filename, extension), openmode)
-        {
-        }
-
-        void write(const PSVector& sfens) override
-        {
-            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(BinPackedPosValue) * sfens.size());
-        }
-
-        ~BinSfenOutputStream() override {}
-
-    private:
-        std::fstream m_stream;
-    };
-
-    struct Bin2OutputStream : BasicSfenOutputStream
-    {
-        static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
-        static inline const std::string extension = "bin2";
-        static constexpr std::array<uint8_t, 5> file_header = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
+    protected:
         bool header_written = false;
+        bool footer_written = false;
+        bool first_position = true;
+    public:
+        void write(PosBuffer* pb) override { assert(false); };
+        void write(const std::vector<PosBuffer*>& pb) override { assert(false); };
+        void write(const std::vector<PackedPosFileData*>& ppfd) override { assert(false); };
+        void write(const PPVector& sfens) override { assert(false); };
+        //void last_pos(bool v) override { last_position=v; };
+        bool is_open() const override { assert(false); return false; };
+    };
 
-        Bin2OutputStream(std::string filename) :
+    struct JpnPosOutputStream : AbstractPosOutputStream
+    {
+        static constexpr auto openmode = std::ios::out | std::ios::app;
+        static inline const std::string extension = "jpn";
+        std::string file_header = "{\"header\":{\"type\":\"jpn\",\"version\":\"1.0\",\"magic\":\"1c36f8e2\"},\n\"variant\":{\"name\":\"chess\",\"files\":8,\"ranks\":8,\"squares\":64,\"types\":12,\"magic\":\"b2d69903\"},\n\"positions\":[";
+        std::string file_footer = "]}\n";
+        std::string pos_separator = ",";
+
+        JpnPosOutputStream(std::string filename) :  
             m_stream(filename_with_extension(filename, extension), openmode)
         {
         }
 
-        void write(const PSVector& sfens) override
+        void write_header() override
         {
             if (!header_written)
             {
                 m_stream.write(file_header.data(), file_header.size());
                 header_written = true;
             }
+        };
 
-            for (auto& sfen : sfens)
+        void write_footer() override
+        {
+            if (!footer_written)
             {
-                int i = (DATA_SIZE / 8) - 1;
-                //int i = (BIN2_DATA_SIZE / 8) - 1;
+                m_stream.write(file_footer.data(), file_footer.size());
+                footer_written = true;
+            }
+        };
 
-                for (; i >= 0; i--)
-                {
-                    if (sfen.v->sfen.data[i] != 0)
-                        break;
-                }
-
-                int write_size = (7 + i + 1) & 0x3FFF;
-
-                m_stream.write(reinterpret_cast<uint8_t*>(&write_size), 2);
-                m_stream.write(reinterpret_cast<const uint8_t*>(&sfen), write_size);
+        void write(const vector<string*>& strs) override
+        {
+            for (string* str : strs)
+            {
+                m_stream.write(str->data(), str->size());
             }
         }
 
-        ~Bin2OutputStream() override {}
+        void write(PosBuffer* pb) override
+        {
+            write_header();
+
+            if (first_position)
+                first_position = false;
+            else
+                m_stream.write(pos_separator.data(), pos_separator.size());
+
+            pb->write(m_stream);
+        }
+
+        void write(const vector<PosBuffer*>& pbs) override
+        {
+            int size = pbs.size();
+
+            write_header();
+
+            for (int i = 0 ; i < size; i++)
+            {
+                pbs[i]->write(m_stream);
+                if ( i < (size - 1) )
+                    m_stream.write(pos_separator.data(), pos_separator.size());
+            }
+
+            write_footer();
+        }
+
+        void write(const vector<PackedPosFileData*>& ppfds) override
+        {
+            for (PackedPosFileData* ppfd : ppfds)
+            {
+                m_stream.write(reinterpret_cast<const char*>(ppfd->data()), ppfd->size());
+            }
+        }
+
+        void write(const PPVector& sfens) override
+        {
+            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(BinPackedPosFileData) * sfens.size());
+        }
+
+        bool is_open() const override
+        {
+            return m_stream.is_open();
+        }
+
+        ~JpnPosOutputStream() override {}
 
     private:
-        std::basic_fstream<uint8_t> m_stream;
+        std::basic_fstream<char> m_stream;
     };
 
-    struct BinpackSfenOutputStream : BasicSfenOutputStream
+
+    struct BinPosOutputStream : AbstractPosOutputStream
     {
         static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
-        static inline const std::string extension = "binpack";
+        static inline const std::string extension = "bin";
 
-        BinpackSfenOutputStream(std::string filename) :
+        BinPosOutputStream(std::string filename) :
             m_stream(filename_with_extension(filename, extension), openmode)
         {
         }
 
-        void write(const PSVector& sfens) override
+        void write(PosBuffer* pb) override
         {
-            //static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(BinPackedPosValue // FIXME.
+            pb->write(m_stream);
+        }
+
+        void write(const vector<PosBuffer*>& pbs) override
+        {
+            for (PosBuffer* pb : pbs)
+            {
+                pb->write(m_stream);
+            }
+        }
+
+        void write(const vector<PackedPosFileData*>& ppfds) override
+        {
+            for (PackedPosFileData* ppfd : ppfds)
+            {
+                m_stream.write(reinterpret_cast<const char*>(ppfd->data()), ppfd->size());
+            }
+        }
+
+        void write(const PPVector& sfens) override
+        {
+            m_stream.write(reinterpret_cast<const char*>(sfens.data()), sizeof(BinPackedPosFileData) * sfens.size());
+        }
+
+        bool is_open() const override
+        {
+            return m_stream.is_open();
+        }
+
+        ~BinPosOutputStream() override {}
+
+    private:
+        std::basic_fstream<char> m_stream;
+    };
+
+    struct Bin2PosOutputStream : AbstractPosOutputStream
+    {
+        static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
+        static inline const std::string extension = "bin2";
+        //static constexpr std::array<uint8_t, 4> file_header = { 0xFE, 0xB7, 0xD2, 0x2F }; // Magic is the first four bytes of SHA256('{type:"bin2",version:"1.0"}').
+        static constexpr std::array<uint8_t, 5> file_header = { 0xC2, 0x34, 0x56, 0x78, 0x20 };
+        bool header_written = false;
+
+        Bin2PosOutputStream(std::string filename) :
+            m_stream(filename_with_extension(filename, extension), openmode)
+        {
+        }
+
+        void write(PosBuffer* pb) override
+        {
+            pb->write(m_stream);
+        }
+
+        void write(const vector<PosBuffer*>& pbs) override
+        {
+            if (!header_written)
+            {
+                m_stream.write(reinterpret_cast<const char*>(file_header.data()), file_header.size());
+                header_written = true;
+            }
+
+            for (PosBuffer* pb : pbs)
+            {
+                pb->write(m_stream);
+            }
+        }
+
+        void write(const vector<PackedPosFileData*>& ppfds) override
+        {
+            if (!header_written)
+            {
+                m_stream.write(reinterpret_cast<const char*>(file_header.data()), file_header.size());
+                header_written = true;
+            }
+
+            for (PackedPosFileData* ppfd : ppfds)
+            {
+                m_stream.write(reinterpret_cast<const char*>(ppfd->data()), ppfd->size());
+            }
+        }
+
+        void write(const PPVector& sfens) override
+        {
+            if (!header_written)
+            {
+                m_stream.write(reinterpret_cast<const char*>(file_header.data()), file_header.size());
+                header_written = true;
+            }
+
+            for (const PackedPos& sfen : sfens)
+            {
+                int write_size = sfen.size();
+                m_stream.write(reinterpret_cast<const char*>(&write_size), 2);
+                m_stream.write(reinterpret_cast<const char*>(sfen.data()), write_size);
+            }
+        }
+
+        bool is_open() const override
+        {
+            return m_stream.is_open();
+        }
+
+        ~Bin2PosOutputStream() override {}
+
+    private:
+        std::basic_fstream<char> m_stream;
+    };
+
+    struct BinpackPosOutputStream : AbstractPosOutputStream
+    {
+        static constexpr auto openmode = std::ios::out | std::ios::binary | std::ios::app;
+        static inline const std::string extension = "binpack";
+
+        BinpackPosOutputStream(std::string filename) :
+            m_stream(filename_with_extension(filename, extension), openmode)
+        {
+        }
+
+        void write(PosBuffer* pb) override
+        {
+            // TODO.
+        }
+
+        void write(const vector<PosBuffer*>& pbs) override
+        {
+            // TODO.
+        }
+
+        void write(const vector<PackedPosFileData*>& ppfds) override
+        {
+            // TODO.
+        }
+
+        void write(const PPVector& sfens) override
+        {
+            //static_assert(sizeof(binpack::nodchip::PackedSfenValue) == sizeof(BinPackedPosFileData // FIXME.
 
             for(auto& sfen : sfens)
             {
@@ -274,48 +510,59 @@ namespace Stockfish::Tools {
             }
         }
 
-        ~BinpackSfenOutputStream() override {}
+        bool is_open() const override
+        {
+            // TODO.
+
+            return false;
+        }
+
+        ~BinpackPosOutputStream() override {}
 
     private:
         binpack::CompressedTrainingDataEntryWriter m_stream;
     };
 
-    inline std::unique_ptr<BasicSfenInputStream> open_sfen_input_file(const std::string& filename)
+    inline std::unique_ptr<PosInputStream> open_sfen_input_file(const std::string& filename)
     {
-        if (has_extension(filename, BinSfenInputStream::extension))
-            return std::make_unique<BinSfenInputStream>(filename);
-        else if (has_extension(filename, BinpackSfenInputStream::extension))
-            return std::make_unique<BinpackSfenInputStream>(filename);
-        else if (has_extension(filename, Bin2InputStream::extension))
-            return std::make_unique<Bin2InputStream>(filename);
+        if (has_extension(filename, BinPosInputStream::extension))
+            return std::make_unique<BinPosInputStream>(filename);
+        else if (has_extension(filename, BinpackPosInputStream::extension))
+            return std::make_unique<BinpackPosInputStream>(filename);
+        else if (has_extension(filename, Bin2PosInputStream::extension))
+            return std::make_unique<Bin2PosInputStream>(filename);
 
         return nullptr;
     }
 
-    inline std::unique_ptr<BasicSfenOutputStream> create_new_sfen_output(const std::string& filename, SfenOutputType sfen_output_type)
+    inline std::unique_ptr<PosOutputStream> create_new_sfen_output(const std::string& filename, SfenOutputType sfen_output_type)
     {
         switch(sfen_output_type)
         {
             case SfenOutputType::Bin:
-                return std::make_unique<BinSfenOutputStream>(filename);
+                return std::make_unique<BinPosOutputStream>(filename);
             case SfenOutputType::Binpack:
-                return std::make_unique<BinpackSfenOutputStream>(filename);
+                return std::make_unique<BinpackPosOutputStream>(filename);
             case SfenOutputType::Bin2:
-                return std::make_unique<Bin2OutputStream>(filename);
+                return std::make_unique<Bin2PosOutputStream>(filename);
+            case SfenOutputType::Jpn:
+                return std::make_unique<JpnPosOutputStream>(filename);
         }
 
         assert(false);
         return nullptr;
     }
 
-    inline std::unique_ptr<BasicSfenOutputStream> create_new_sfen_output(const std::string& filename)
+    inline std::unique_ptr<PosOutputStream> create_new_sfen_output(const std::string& filename)
     {
-        if (has_extension(filename, BinSfenOutputStream::extension))
-            return std::make_unique<BinSfenOutputStream>(filename);
-        else if (has_extension(filename, BinpackSfenOutputStream::extension))
-            return std::make_unique<BinpackSfenOutputStream>(filename);
-        else if (has_extension(filename, Bin2OutputStream::extension))
-            return std::make_unique<Bin2OutputStream>(filename);
+        if (has_extension(filename, BinPosOutputStream::extension))
+            return std::make_unique<BinPosOutputStream>(filename);
+        else if (has_extension(filename, BinpackPosOutputStream::extension))
+            return std::make_unique<BinpackPosOutputStream>(filename);
+        else if (has_extension(filename, Bin2PosOutputStream::extension))
+            return std::make_unique<Bin2PosOutputStream>(filename);
+        else if (has_extension(filename, JpnPosOutputStream::extension))
+            return std::make_unique<JpnPosOutputStream>(filename);
 
         return nullptr;
     }

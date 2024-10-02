@@ -2,6 +2,7 @@
 
 #include "sfen_writer.h"
 #include "packed_sfen.h"
+#include "poscodec.h"
 #include "opening_book.h"
 
 #include "misc.h"
@@ -135,11 +136,11 @@ namespace Stockfish::Tools
 
         bool commit_psv(
             Thread& th,
-            PSVector& sfens,
+            PPVector& sfens,
             std::atomic<uint64_t>& counter,
             uint64_t limit);
 
-        PSVector do_exploration(
+        PPVector do_exploration(
             Thread& th,
             int count);
 
@@ -189,13 +190,13 @@ namespace Stockfish::Tools
         std::cout << std::endl;
     }
 
-    PSVector TrainingDataGeneratorNonPv::do_exploration(
+    PPVector TrainingDataGeneratorNonPv::do_exploration(
         Thread& th,
         int count)
     {
         constexpr int max_depth = 30;
 
-        PSVector psv;
+        PPVector psv;
 
         std::vector<StateInfo, AlignedAllocator<StateInfo>> states(
             max_depth + MAX_PLY /* == search_depth_min + α */);
@@ -204,7 +205,8 @@ namespace Stockfish::Tools
             if ((double)prng.rand<uint64_t>() / std::numeric_limits<uint64_t>::max() < params.exploration_save_rate)
             {
                 psv.emplace_back();
-                pos.sfen_pack(psv.back().v->sfen);
+                //pos.sfen_pack(psv.back()._data);
+                //Tools::pos_codec->encode(pos); // FIXME.
             }
         });
 
@@ -262,7 +264,7 @@ namespace Stockfish::Tools
 
         StateInfo si;
 
-        PSVector psv;
+        PPVector psv;
 
         // end flag
         bool quit = false;
@@ -280,7 +282,10 @@ namespace Stockfish::Tools
 
             for (auto& ps : packed_sfens)
             {
-                Tools::set_from_packed_sfen(pos,ps.v->sfen, &si, &th);
+                //Tools::set_from_packed_sfen(pos,ps.v->sfen, &si, &th);
+                // FIXME: need to assign data to pos_codec before decoding.
+                //Tools::pos_codec->decode(pos); // FIXME.
+
                 pos.state()->rule50 = 0;
 
                 if (params.smart_fen_skipping && pos.checkers())
@@ -307,12 +312,14 @@ namespace Stockfish::Tools
 
                 auto& new_ps = psv.emplace_back();
 
-                pos.sfen_pack(new_ps.v->sfen);
-                new_ps.v->score = search_value;
-                new_ps.v->move = search_pv[0];
-                new_ps.v->gamePly = 1;
-                new_ps.v->game_result = 0;
-                new_ps.v->padding = 0;
+                //pos.sfen_pack(new_ps.v->sfen);
+                //Tools::pos_codec->encode(pos); // FIXME.
+                // FIXME: need to extract data from pos_codec after encoding.
+
+                new_ps.score( search_value );
+                new_ps.move(  search_pv[0] );
+                new_ps.ply( 1 );
+                new_ps.result( 0 );
             }
 
             quit = commit_psv(th, psv, counter, limit);
@@ -326,7 +333,7 @@ namespace Stockfish::Tools
     // sfens has already been reached and the process ends.
     bool TrainingDataGeneratorNonPv::commit_psv(
         Thread& th,
-        PSVector& sfens,
+        PPVector& sfens,
         std::atomic<uint64_t>& counter,
         uint64_t limit)
     {

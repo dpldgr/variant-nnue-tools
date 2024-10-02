@@ -108,6 +108,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
   for (Bitboard b = pos.state()->chased; b; )
       os << UCI::square(pos, pop_lsb(b)) << " ";
 
+  /* FIXME. 
   if (    int(Tablebases::MaxCardinality) >= popcount(pos.pieces())
       && Options["UCI_Variant"] == "chess"
       && !pos.can_castle(ANY_CASTLING))
@@ -123,10 +124,10 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
       os << "\nTablebases WDL: " << std::setw(4) << wdl << " (" << s1 << ")"
          << "\nTablebases DTZ: " << std::setw(4) << dtz << " (" << s2 << ")";
   }
+  //*/
 
   return os;
 }
-
 
 // Marcel van Kervinck's cuckoo algorithm for fast detection of "upcoming repetition"
 // situations. Description of the algorithm in the following paper:
@@ -216,6 +217,30 @@ void Position::init() {
 #endif
 }
 
+Position& Position::set(const FenData* fen, StateInfo* si, Thread* th) {
+
+    this->clear();
+    si->clear();
+
+    for ( Square sq = SQ_A1; sq < SQ_MAX ; ++sq )
+    {
+        if (fen->board[sq])
+            put_piece(fen->board[sq], sq);
+    }
+
+    sideToMove = Color(fen->move_ply % 2);
+    st->epSquares = fen->ep_squares;
+    st->rule50 = fen->n_move_ply;
+    gamePly = fen->move_ply;
+    chess960 = var->chess960;
+    tsumeMode = Options["TsumeMode"];
+    thisThread = th;
+    set_state(st);
+
+    assert(pos_is_ok());
+
+    return *this;
+}
 
 /// Position::set() initializes the position object with the given FEN string.
 /// This function is not very robust - make sure that input FENs are correct,
@@ -265,7 +290,7 @@ Position& Position::set(const Variant* v, const string& fenStr, bool isChess960,
   std::memset(si, 0, sizeof(StateInfo));
   st = si;
 
-  var = v;
+  var = v;  
 
   ss >> std::noskipws;
 
@@ -325,7 +350,7 @@ Position& Position::set(const Variant* v, const string& fenStr, bool isChess960,
           put_piece(make_piece(color_of(Piece(idx)), promoted_piece_type(type_of(Piece(idx)))), sq, true, Piece(idx));
           ++sq;
       }
-  }
+      }
   // Pieces in hand
   if (!isspace(token))
       while ((ss >> token) && !isspace(token))
@@ -3298,7 +3323,7 @@ int Position::set_from_packed_sfen(const Tools::BinPackedPosBuffer& sfen , State
 //*/
 
 // Get the packed sfen. Returns to the buffer specified in the argument.
-//*
+/*
 // TODO: remove this from class Position, this kind of thing is not it's responsibility.
 void Position::sfen_pack(Tools::BinPackedPosBuffer& sfen)
 {

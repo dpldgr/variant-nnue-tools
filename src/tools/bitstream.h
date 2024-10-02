@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cmath>
 
 namespace Stockfish::Tools {
 
@@ -17,6 +18,12 @@ namespace Stockfish::Tools {
 
         // Get the cursor.
         int get_cursor() const { return bit_cursor; }
+
+        // Set the cursor.
+        void set_cursor( int bit_cursor_ ) { bit_cursor = bit_cursor_; }
+
+        // Get the data size in bytes.
+        int size_bytes() const { return ceil(bit_cursor / 8.0); }
 
         // reset the cursor
         void reset() { bit_cursor = 0; }
@@ -57,6 +64,18 @@ namespace Stockfish::Tools {
                 result |= read_one_bit() ? (1 << i) : 0;
 
             return result;
+        }
+
+        template<typename T>
+        T read()
+        {
+            return T(read_n_bit(sizeof(T)));
+        }
+
+        template<typename T>
+        void write( T t )
+        {
+            write_n_bit(t, sizeof(T));
         }
 
     private:

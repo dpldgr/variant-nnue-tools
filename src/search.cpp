@@ -163,7 +163,7 @@ void Search::clear() {
   Time.availableNodes = 0;
   TT.clear();
   Threads.clear();
-  Tablebases::init(Options["SyzygyPath"]); // Free mapped files
+  //Tablebases::init(Options["SyzygyPath"]); // Free mapped files
 }
 
 
@@ -336,8 +336,10 @@ void Thread::search() {
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
 
+  /* FIXME. 
   if (!this->rootMoves.empty())
     Tablebases::rank_root_moves(this->rootPos, this->rootMoves);
+  //*/
 
   if (mainThread)
   {
@@ -383,9 +385,17 @@ void Thread::search() {
   int searchAgainCounter = 0;
 
   // Iterative deepening loop until requested to stop or the target depth is reached
+  /*
   while (   ++rootDepth < MAX_PLY
          && !Threads.stop
          && !(Limits.depth && mainThread && rootDepth > Limits.depth))
+  //*/
+  //while (++rootDepth < MAX_PLY && !Threads.stop && !(Limits.depth && mainThread && rootDepth > Limits.depth))
+  while ( ++rootDepth < MAX_PLY 
+         && !Threads.stop 
+         //&& !(Limits.depth && mainThread && rootDepth > Limits.depth)
+         && !(Limits.depthnodes && mainThread && rootDepth > Limits.depth && Threads.nodes_searched() >= Limits.nodes)
+      )
   {
       // Age out PV variability metric
       if (mainThread)
@@ -811,6 +821,7 @@ namespace {
     }
 
     // Step 5. Tablebases probe
+    /* FIXME 
     if (!rootNode && thisThread->Cardinality)
     {
         int piecesCount = pos.count<ALL_PIECES>();
@@ -862,6 +873,7 @@ namespace {
             }
         }
     }
+    //*/
 
     CapturePieceToHistory& captureHistory = thisThread->captureHistory;
 
@@ -1976,7 +1988,8 @@ void MainThread::check_time() {
 
   if (   (Limits.use_time_management() && (elapsed > Time.maximum() - 10 || stopOnPonderhit))
       || (Limits.movetime && elapsed >= Limits.movetime)
-      || (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes))
+      //|| (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes)
+      )
       Threads.stop = true;
 }
 
@@ -2092,6 +2105,7 @@ bool RootMove::extract_ponder_from_tt(Position& pos) {
     return pv.size() > 1;
 }
 
+/* FIXME 
 void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
 
     pos.this_thread()->Cardinality = int(Options["SyzygyProbeLimit"]);
@@ -2143,6 +2157,7 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
     }
 
 }
+//*/
 
 // --- expose the functions such as fixed depth search used for learning to the outside
 namespace Search
@@ -2199,7 +2214,7 @@ namespace Search
       if (rootMoves.empty())
         return false;
 
-      Tablebases::rank_root_moves(pos, rootMoves);
+      //Tablebases::rank_root_moves(pos, rootMoves); // FIXME
     }
 
     return true;
@@ -2307,11 +2322,16 @@ namespace Search
     Value delta = -VALUE_INFINITE;
     Value bestValue = -VALUE_INFINITE;
 
+    /*
     while ((rootDepth += 1) <= depth
       // exit this loop even if the node limit is exceeded
       // The number of search nodes is passed in the argument of this function.
-      && !(nodesLimit /* limited nodes */ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit)
+      && !(nodesLimit /* limited nodes * / && th->nodes.load(std::memory_order_relaxed) >= nodesLimit)
       )
+    //*/
+
+    //while ((rootDepth += 1) <= depth && !(nodesLimit /* limited nodes */ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit))
+    while ( (rootDepth += 1) <= depth && !(nodesLimit && th->nodes.load(std::memory_order_relaxed) >= nodesLimit))
     {
       for (RootMove& rm : rootMoves)
         rm.previousScore = rm.score;

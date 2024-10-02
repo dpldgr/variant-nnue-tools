@@ -74,7 +74,7 @@ namespace Stockfish::Tools {
             // and immediately after writing the thread buffer.
             if (!buf)
             {
-                buf = std::make_unique<PSVector>();
+                buf = std::make_unique<PPVector>();
                 buf->reserve(SFEN_WRITE_SIZE);
             }
 
@@ -119,14 +119,14 @@ namespace Stockfish::Tools {
         {
             while (!finished || sfen_buffers_pool.size())
             {
-                std::vector<std::unique_ptr<PSVector>> buffers;
+                std::vector<std::unique_ptr<PPVector>> buffers;
                 {
                     std::unique_lock<std::mutex> lk(mutex);
 
                     // Atomically swap take the filled buffers and
                     // create a new buffer pool for threads to fill.
                     buffers = std::move(sfen_buffers_pool);
-                    sfen_buffers_pool = std::vector<std::unique_ptr<PSVector>>();
+                    sfen_buffers_pool = std::vector<std::unique_ptr<PPVector>>();
                 }
 
                 if (!buffers.size())
@@ -168,7 +168,7 @@ namespace Stockfish::Tools {
 
     private:
 
-        std::unique_ptr<BasicSfenOutputStream> output_file_stream;
+        std::unique_ptr<PosOutputStream> output_file_stream;
 
         // A new net is saved after every save_every sfens are processed.
         uint64_t save_every = std::numeric_limits<uint64_t>::max();
@@ -189,8 +189,8 @@ namespace Stockfish::Tools {
         // sfen_buffers_pool is a buffer for writing.
         // After loading the phase in the former buffer by SFEN_WRITE_SIZE,
         // transfer it to the latter.
-        std::vector<std::unique_ptr<PSVector>> sfen_buffers;
-        std::vector<std::unique_ptr<PSVector>> sfen_buffers_pool;
+        std::vector<std::unique_ptr<PPVector>> sfen_buffers;
+        std::vector<std::unique_ptr<PPVector>> sfen_buffers_pool;
 
         // Mutex required to access sfen_buffers_pool
         std::mutex mutex;

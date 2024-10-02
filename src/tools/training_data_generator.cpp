@@ -131,7 +131,7 @@ namespace Stockfish::Tools
             params(prm),
             sfen_writer(prm.output_file_name, prm.num_threads, prm.save_every, prm.sfen_format)
         {
-            pos_codec = get_codec_type(prm.sfen_format);
+            pos_codec = codecs.get_type(prm.sfen_format);
             hash.resize(GENSFEN_HASH_SIZE);
             prngs.reserve(prm.num_threads);
             auto seed = prm.seed;
@@ -197,7 +197,7 @@ namespace Stockfish::Tools
 
         bool commit_psv(
             Thread& th,
-            PSVector& sfens,
+            PPVector& sfens,
             int8_t lastTurnIsWin,
             std::atomic<uint64_t>& counter,
             uint64_t limit,
@@ -273,7 +273,9 @@ namespace Stockfish::Tools
             // It is necessary to set a dependent thread for Position.
             // When parallelizing, Threads (since this is a vector<Thread*>,
             // Do the same for up to Threads[0]...Threads[thread_num-1].
-            auto& pos = th.rootPos;
+            PosData pd(th.rootPos);
+            Position& pos = th.rootPos;
+
             if (opening_book != nullptr)
             {
                 auto& fen = opening_book->next_fen();
@@ -287,7 +289,9 @@ namespace Stockfish::Tools
             int resign_counter = 0;
             bool should_resign = prng.rand(10) > 1;
             // Vector for holding the sfens in the current simulated game.
-            PSVector packed_sfens;
+            PPVector packed_sfens;
+            PBVector pos_buffers;
+            pos_buffers.reserve(params.write_maxply + MAX_PLY);
             packed_sfens.reserve(params.write_maxply + MAX_PLY);
 
             // Precomputed flags. Used internally by choose_random_move.
@@ -364,14 +368,19 @@ namespace Stockfish::Tools
 
                     // Here we only write the position data.
                     // Result is added after the whole game is done.
-                    Tools::pos_codec->encode(pos);
+                    Tools::pos_codec->encode(pd);
+                    //Tools::pos_codec->encode(pos); // FIXME.
                     //psv = Tools::sfen_pack(pos);
                     //psv = Tools::sfen_pack(pos, params.sfen_format); // FIXME.
                     //psv.pack(pos, params.sfen_format); // FIXME.
 
-                    psv.v->score = search_value;
-                    psv.v->move = search_pv[0];
-                    psv.v->gamePly = ply;
+                    //psv.score( search_value );
+                    //psv.move( search_pv[0] );
+                    //psv.ply( ply );
+
+                    pd.score = search_value;
+                    pd.move = search_pv[0];
+                    pd.game_ply = ply;
                 }
 
                 // Update the next move according to best search result or random move.
@@ -650,7 +659,7 @@ namespace Stockfish::Tools
     // sfens has already been reached and the process ends.
     bool TrainingDataGenerator::commit_psv(
         Thread& th,
-        PSVector& sfens,
+        PPVector& sfens,
         int8_t result,
         std::atomic<uint64_t>& counter,
         uint64_t limit,
@@ -669,7 +678,7 @@ namespace Stockfish::Tools
             // The side to move is packed as the lowest bit of the first byte
             // const Color side_to_move = side_to_move_from_sfen(*it);
             // it->game_result = side_to_move == result_color ? result : -result;
-            it->set_result(result);
+            it->result(result);
         }
 
         // Write sfens in move order to make potential compression easier
