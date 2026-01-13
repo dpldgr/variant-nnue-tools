@@ -151,6 +151,15 @@ Key cuckoo[8192];
 Move cuckooMove[8192];
 #endif
 
+size_t get_thread_id( const Position& pos )
+{
+	return pos.this_thread()->id();
+}
+
+movelist_buf& get_thread_mlb( const Position& pos )
+{
+	return mlb[pos.this_thread()->id()];
+}
 
 /// Position::init() initializes at startup the various arrays used to compute hash keys
 

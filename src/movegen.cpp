@@ -23,6 +23,8 @@
 
 namespace Stockfish {
 
+movelist_buf mlb[512];
+
 namespace {
 
   template<MoveType T>

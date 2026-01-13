@@ -1528,6 +1528,9 @@ inline const std::string Position::piece_to_partner() const {
   return std::string(1, piece_to_char()[piece]);
 }
 
+size_t get_thread_id( const Position& pos );
+movelist_buf& get_thread_mlb( const Position& pos );
+
 inline Thread* Position::this_thread() const {
   return thisThread;
 }

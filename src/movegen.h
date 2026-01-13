@@ -26,6 +26,8 @@
 namespace Stockfish {
 
 class Position;
+class movelist_buf;
+size_t get_thread_id( const Position& pos );
 
 enum GenType {
   CAPTURES,
@@ -55,36 +57,96 @@ inline bool operator<(const ExtMove& f, const ExtMove& s) {
 template<GenType>
 ExtMove* generate(const Position& pos, ExtMove* moveList);
 
-constexpr size_t moveListSize = sizeof(ExtMove) * MAX_MOVES;
+    class movelist_buf
+    {
+    public:
+        movelist_buf() : movelist_buf(MAX_MOVES,64) {}
+        movelist_buf(int move_count_, int list_count_)
+        {
+            this->move_count = move_count_;
+            this->list_count = list_count_;
+
+            constexpr std::size_t move_size = sizeof(ExtMove);
+            const std::size_t list_size = move_size * move_count;
+            const std::size_t malloc_size = list_size * list_count;
+
+            ptr_stack = (ExtMove**)malloc(sizeof(ExtMove*) * list_count );
+            data = (ExtMove*)malloc(malloc_size);
+
+            for (int i = 0; i < (list_count - 1); i++)
+            {
+                ptr_stack[i] = (ExtMove*)(data + i * move_count);
+            }
+
+            ptr_stack[list_count - 1] = nullptr; // The last element is used as a guard value.
+        }
+
+        ~movelist_buf()
+        {
+            if (ptr_stack) free(ptr_stack);
+            if (data) free(data);
+        }
+
+        void resize(const int move_count_, int list_count_)
+        {
+            this->move_count = move_count_;
+            this->list_count = list_count_;
+
+            constexpr std::size_t move_size = sizeof(ExtMove);
+            const std::size_t list_size = move_size * move_count;
+            const std::size_t malloc_size = list_size * list_count;
+
+            if (ptr_stack) free(ptr_stack);
+            if (data) free(data);
+
+            ptr_stack = (ExtMove**)malloc(sizeof(ExtMove*) * list_count );
+            data = (ExtMove*)malloc(malloc_size);
+
+            for (int i = 0; i < (list_count - 1); i++)
+            {
+                ptr_stack[i] = (ExtMove*)(data + i * move_count);
+            }
+
+            ptr_stack[list_count - 1] = nullptr; // The last element is used as a guard value.
+        }
+
+        ExtMove* acquire()
+        {
+            return ptr_stack[top++];
+        }
+
+        void release(ExtMove* ptr)
+        {
+            ptr_stack[--top] = ptr;
+        }
+
+        ExtMove** ptr_stack = nullptr;
+        ExtMove* data = nullptr;
+        int top = 0;
+        int list_count = 0;
+        int move_count = 0;
+    };
+
+	extern movelist_buf mlb[512];
+
+movelist_buf& get_thread_mlb( const Position& pos );
 
 /// The MoveList struct is a simple wrapper around generate(). It sometimes comes
 /// in handy to use this class instead of the low level generate() function.
 template<GenType T>
 struct MoveList {
 
-  
-#ifdef USE_HEAP_INSTEAD_OF_STACK_FOR_MOVE_LIST
     explicit MoveList(const Position& pos)
+    :mlb_(get_thread_mlb(pos))
     {
-        this->moveList = (ExtMove*)malloc(moveListSize);
-        if (this->moveList == 0)
-        {
-            printf("Error: Failed to allocate memory in heap.");
-            exit(1);
-        }
+        this->moveList = mlb_.acquire();
         this->last = generate<T>(pos, this->moveList);
     }
 
     ~MoveList()
     {
-        free(this->moveList);
+        mlb_.release(this->moveList);
     }
-#else
-    explicit MoveList(const Position& pos) : last(generate<T>(pos, moveList))
-    {
-        ;
-    }
-#endif
   
   const ExtMove* begin() const { return moveList; }
   const ExtMove* end() const { return last; }
@@ -97,12 +159,9 @@ struct MoveList {
   const ExtMove at(size_t i) const { assert(0 <= i && i < size()); return begin()[i]; }
 
 private:
+    movelist_buf& mlb_;
     ExtMove* last;
-#ifdef USE_HEAP_INSTEAD_OF_STACK_FOR_MOVE_LIST
-    ExtMove* moveList = 0;
-#else
-    ExtMove moveList[MAX_MOVES];
-#endif
+    ExtMove* moveList = nullptr;
 };
 
 } // namespace Stockfish
